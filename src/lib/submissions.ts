@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto"
 import { mkdir, readFile, writeFile } from "fs/promises"
 import os from "os"
 import path from "path"
@@ -6,7 +7,7 @@ import { getDatabase } from "@/lib/mongodb"
 import type { FormSubmission, MessageStatus, NormalizedSubmission } from "@/types"
 
 interface SubmissionDocument {
-  _id: ObjectId
+  _id?: ObjectId
   externalId: string
   name: string
   phone: string
@@ -63,7 +64,7 @@ async function getCollection() {
 
 function mapMongoSubmission(doc: SubmissionDocument): FormSubmission {
   return {
-    id: doc._id.toString(),
+    id: doc._id ? doc._id.toString() : doc.externalId,
     externalId: doc.externalId,
     name: doc.name,
     phone: doc.phone,
@@ -131,6 +132,10 @@ export async function upsertSubmission(normalized: NormalizedSubmission, sourceP
     const existing = await collection.findOne({ externalId: normalized.externalId })
 
     if (existing) {
+      if (!existing._id) {
+        throw new Error("Existing submission missing _id")
+      }
+
       await collection.updateOne(
         { _id: existing._id },
         {
@@ -254,6 +259,10 @@ export async function listSubmissions() {
 
 export async function markWelcomeStatus(id: string, success: boolean, errorMessage?: string) {
   if (shouldUseMongo()) {
+    if (!ObjectId.isValid(id)) {
+      throw new Error("Invalid submission id")
+    }
+
     const collection = await getCollection()
     const now = new Date()
 
@@ -274,7 +283,7 @@ export async function markWelcomeStatus(id: string, success: boolean, errorMessa
 
   const records = await readFileStore()
   const now = new Date().toISOString()
-  const updatedRecords = records.map((item) => {
+  const updatedRecords: FileSubmissionRecord[] = records.map((item): FileSubmissionRecord => {
     if (item.id !== id) return item
     return {
       ...item,
@@ -289,6 +298,10 @@ export async function markWelcomeStatus(id: string, success: boolean, errorMessa
 
 export async function markReminderStatus(id: string, success: boolean, errorMessage?: string) {
   if (shouldUseMongo()) {
+    if (!ObjectId.isValid(id)) {
+      throw new Error("Invalid submission id")
+    }
+
     const collection = await getCollection()
     const now = new Date()
 
@@ -309,7 +322,7 @@ export async function markReminderStatus(id: string, success: boolean, errorMess
 
   const records = await readFileStore()
   const now = new Date().toISOString()
-  const updatedRecords = records.map((item) => {
+  const updatedRecords: FileSubmissionRecord[] = records.map((item): FileSubmissionRecord => {
     if (item.id !== id) return item
     return {
       ...item,
@@ -324,6 +337,10 @@ export async function markReminderStatus(id: string, success: boolean, errorMess
 
 export async function markReminderPending(id: string) {
   if (shouldUseMongo()) {
+    if (!ObjectId.isValid(id)) {
+      throw new Error("Invalid submission id")
+    }
+
     const collection = await getCollection()
 
     await collection.updateOne(
@@ -342,7 +359,7 @@ export async function markReminderPending(id: string) {
 
   const records = await readFileStore()
   const now = new Date().toISOString()
-  const updatedRecords = records.map((item) => {
+  const updatedRecords: FileSubmissionRecord[] = records.map((item): FileSubmissionRecord => {
     if (item.id !== id) return item
     return {
       ...item,
