@@ -45,10 +45,38 @@ function formatDateTime(iso?: string | null) {
   }).format(date)
 }
 
+function getDeliveryStatus(submission: FormSubmission, kind: "welcome" | "reminder") {
+  const delivery = kind === "welcome" ? submission.welcomeDeliveryStatus : submission.reminderDeliveryStatus
+  if (delivery) {
+    return delivery
+  }
+
+  const status = kind === "welcome" ? submission.welcomeStatus : submission.reminderStatus
+  if (status === "sent") return "accepted"
+  if (status === "failed") return "failed"
+  if (status === "not_scheduled") return "not_scheduled"
+  return "pending"
+}
+
+function isSentLike(status: string) {
+  return ["sent", "accepted", "delivered", "read"].includes(status)
+}
+
+function shortMessageId(messageId?: string | null) {
+  if (!messageId) return ""
+  if (messageId.length <= 22) return messageId
+  return `${messageId.slice(0, 10)}...${messageId.slice(-8)}`
+}
+
 function statusBadge(status: string) {
   switch (status) {
     case "sent":
-      return <Badge className="bg-green-600">Sent</Badge>
+    case "accepted":
+      return <Badge className="bg-blue-600">Accepted</Badge>
+    case "delivered":
+      return <Badge className="bg-green-600">Delivered</Badge>
+    case "read":
+      return <Badge className="bg-emerald-700">Read</Badge>
     case "failed":
       return <Badge variant="destructive">Failed</Badge>
     case "pending":
@@ -131,15 +159,15 @@ export default function Dashboard() {
 
     if (filters.status !== "all") {
       if (filters.status === "welcome_sent") {
-        result = result.filter((submission) => submission.welcomeStatus === "sent")
+        result = result.filter((submission) => isSentLike(getDeliveryStatus(submission, "welcome")))
       } else if (filters.status === "welcome_failed") {
-        result = result.filter((submission) => submission.welcomeStatus === "failed")
+        result = result.filter((submission) => getDeliveryStatus(submission, "welcome") === "failed")
       } else if (filters.status === "reminder_sent") {
-        result = result.filter((submission) => submission.reminderStatus === "sent")
+        result = result.filter((submission) => isSentLike(getDeliveryStatus(submission, "reminder")))
       } else if (filters.status === "reminder_pending") {
-        result = result.filter((submission) => submission.reminderStatus === "pending")
+        result = result.filter((submission) => getDeliveryStatus(submission, "reminder") === "pending")
       } else if (filters.status === "missing_event_date") {
-        result = result.filter((submission) => submission.reminderStatus === "not_scheduled")
+        result = result.filter((submission) => getDeliveryStatus(submission, "reminder") === "not_scheduled")
       }
     }
 
@@ -407,59 +435,84 @@ export default function Dashboard() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredSubmissions.map((submission) => (
-                  <TableRow key={submission.id} className={selectedIds.has(submission.id) ? "bg-blue-50" : ""}>
-                    <TableCell>
-                      <Checkbox
-                        checked={selectedIds.has(submission.id)}
-                        onCheckedChange={() => toggleSelect(submission.id)}
-                      />
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      <div className="flex items-center gap-2">
-                        <User className="h-4 w-4 text-gray-400" />
-                        {submission.name}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Phone className="h-4 w-4 text-gray-400" />
-                        {submission.phone}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {submission.email && (
+                {filteredSubmissions.map((submission) => {
+                  const welcomeStatus = getDeliveryStatus(submission, "welcome")
+                  const reminderStatus = getDeliveryStatus(submission, "reminder")
+
+                  return (
+                    <TableRow key={submission.id} className={selectedIds.has(submission.id) ? "bg-blue-50" : ""}>
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedIds.has(submission.id)}
+                          onCheckedChange={() => toggleSelect(submission.id)}
+                        />
+                      </TableCell>
+                      <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
-                          <Mail className="h-4 w-4 text-gray-400" />
-                          {submission.email}
+                          <User className="h-4 w-4 text-gray-400" />
+                          {submission.name}
                         </div>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {submission.city && (
-                        <Badge variant="secondary">
-                          <MapPin className="h-3 w-3 mr-1" />
-                          {submission.city}
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {submission.gender && (
-                        <Badge variant={submission.gender.toLowerCase() === "male" ? "default" : "outline"}>
-                          {submission.gender}
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2 text-sm text-gray-700">
-                        <Calendar className="h-4 w-4 text-gray-400" />
-                        {formatDateTime(submission.eventAt)}
-                      </div>
-                    </TableCell>
-                    <TableCell>{statusBadge(submission.welcomeStatus)}</TableCell>
-                    <TableCell>{statusBadge(submission.reminderStatus)}</TableCell>
-                  </TableRow>
-                ))}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Phone className="h-4 w-4 text-gray-400" />
+                          {submission.phone}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {submission.email && (
+                          <div className="flex items-center gap-2">
+                            <Mail className="h-4 w-4 text-gray-400" />
+                            {submission.email}
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {submission.city && (
+                          <Badge variant="secondary">
+                            <MapPin className="h-3 w-3 mr-1" />
+                            {submission.city}
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {submission.gender && (
+                          <Badge variant={submission.gender.toLowerCase() === "male" ? "default" : "outline"}>
+                            {submission.gender}
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2 text-sm text-gray-700">
+                          <Calendar className="h-4 w-4 text-gray-400" />
+                          {formatDateTime(submission.eventAt)}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-1">
+                          {statusBadge(welcomeStatus)}
+                          {submission.welcomeMessageId && (
+                            <p className="text-[11px] text-gray-500">ID: {shortMessageId(submission.welcomeMessageId)}</p>
+                          )}
+                          {submission.welcomeDeliveryError && (
+                            <p className="text-[11px] text-red-600">{submission.welcomeDeliveryError}</p>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="space-y-1">
+                          {statusBadge(reminderStatus)}
+                          {submission.reminderMessageId && (
+                            <p className="text-[11px] text-gray-500">ID: {shortMessageId(submission.reminderMessageId)}</p>
+                          )}
+                          {submission.reminderDeliveryError && (
+                            <p className="text-[11px] text-red-600">{submission.reminderDeliveryError}</p>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
               </TableBody>
             </Table>
           </Card>

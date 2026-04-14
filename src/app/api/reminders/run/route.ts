@@ -22,7 +22,7 @@ async function runReminderDispatch() {
   const end = new Date(now.getTime() + 48 * 60 * 60 * 1000)
 
   const targets = await getPendingReminderSubmissions(start, end)
-  const outcomes: Array<{ submissionId: string; success: boolean; message: string }> = []
+  const outcomes: Array<{ submissionId: string; success: boolean; message: string; messageId?: string; deliveryStatus?: string }> = []
 
   for (const submission of targets) {
     try {
@@ -32,12 +32,17 @@ async function runReminderDispatch() {
       })
 
       const result = await sendReminderWhatsApp(submission.phone, message)
-      await markReminderStatus(submission.id, result.success, result.success ? undefined : result.message)
+      await markReminderStatus(submission.id, result.success, result.success ? undefined : result.message, {
+        messageId: result.messageId,
+        deliveryStatus: result.deliveryStatus,
+      })
 
       outcomes.push({
         submissionId: submission.id,
         success: result.success,
         message: result.message,
+        messageId: result.messageId,
+        deliveryStatus: result.deliveryStatus,
       })
     } catch (error) {
       console.error("Reminder send failure:", error)

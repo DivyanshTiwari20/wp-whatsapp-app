@@ -77,13 +77,18 @@ export async function POST(request: NextRequest) {
       })
 
       const result = await sendWelcomeWhatsApp(submission.phone, message)
-      await markWelcomeStatus(submission.id, result.success, result.success ? undefined : result.message)
+      await markWelcomeStatus(submission.id, result.success, result.success ? undefined : result.message, {
+        messageId: result.messageId,
+        deliveryStatus: result.deliveryStatus,
+      })
 
       return jsonWithCors(request, {
         success: result.success,
         submissionId: submission.id,
         externalId: submission.externalId,
         message: result.message,
+        messageId: result.messageId,
+        deliveryStatus: result.deliveryStatus,
       })
     }
 
@@ -92,6 +97,8 @@ export async function POST(request: NextRequest) {
       submissionId: submission.id,
       externalId: submission.externalId,
       message: "Submission already exists and welcome message was already sent",
+      messageId: submission.welcomeMessageId || null,
+      deliveryStatus: submission.welcomeDeliveryStatus || null,
     })
   } catch (error) {
     console.error("Webhook processing failed:", error)

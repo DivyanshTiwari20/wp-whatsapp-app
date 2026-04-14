@@ -1,4 +1,4 @@
-import type { SendMessageResponse } from "@/types"
+import type { DeliveryStatus, SendMessageResponse } from "@/types"
 
 interface SendOptions {
   templateName?: string
@@ -39,6 +39,22 @@ function getMessagesEndpoint() {
   return `${trimmedBase}/messages`
 }
 
+function normalizeApiStatus(status: unknown): DeliveryStatus {
+  if (typeof status !== "string") {
+    return "unknown"
+  }
+
+  const normalized = status.toLowerCase()
+
+  if (normalized === "accepted") return "accepted"
+  if (normalized === "delivered") return "delivered"
+  if (normalized === "read") return "read"
+  if (normalized === "failed") return "failed"
+  if (normalized === "sent") return "accepted"
+
+  return "unknown"
+}
+
 export async function sendWhatsAppText(phone: string, message: string): Promise<SendMessageResponse> {
   return sendWhatsAppMessage(phone, message)
 }
@@ -46,14 +62,14 @@ export async function sendWhatsAppText(phone: string, message: string): Promise<
 export async function sendWelcomeWhatsApp(phone: string, fallbackMessage: string) {
   return sendWhatsAppMessage(phone, fallbackMessage, {
     templateName: process.env.WHATSAPP_WELCOME_TEMPLATE_NAME,
-    templateLanguage: process.env.WHATSAPP_TEMPLATE_LANGUAGE || "en_US",
+    templateLanguage: process.env.WHATSAPP_TEMPLATE_LANGUAGE || "en",
   })
 }
 
 export async function sendReminderWhatsApp(phone: string, fallbackMessage: string) {
   return sendWhatsAppMessage(phone, fallbackMessage, {
     templateName: process.env.WHATSAPP_REMINDER_TEMPLATE_NAME,
-    templateLanguage: process.env.WHATSAPP_TEMPLATE_LANGUAGE || "en_US",
+    templateLanguage: process.env.WHATSAPP_TEMPLATE_LANGUAGE || "en",
   })
 }
 
@@ -63,6 +79,7 @@ async function sendWhatsAppMessage(phone: string, message: string, options?: Sen
       success: false,
       message: "Phone and message are required",
       recipient: phone,
+      deliveryStatus: "failed",
     }
   }
 
@@ -80,7 +97,7 @@ async function sendWhatsAppMessage(phone: string, message: string, options?: Sen
             template: {
               name: options.templateName,
               language: {
-                code: options.templateLanguage || "en_US",
+                code: options.templateLanguage || "en",
               },
             },
           }
@@ -107,13 +124,21 @@ async function sendWhatsAppMessage(phone: string, message: string, options?: Sen
           success: false,
           message: data?.error?.message || "Failed to send message",
           recipient: phone,
+          deliveryStatus: "failed",
         }
       }
+
+      const messageId = Array.isArray(data?.messages) ? data.messages[0]?.id : undefined
+      const deliveryStatus = normalizeApiStatus(
+        Array.isArray(data?.messages) ? data.messages[0]?.message_status : "accepted",
+      )
 
       return {
         success: true,
         message: "Message accepted by WhatsApp",
         recipient: phone,
+        messageId,
+        deliveryStatus,
       }
     } catch (error) {
       console.error("WhatsApp API error:", error)
@@ -121,6 +146,7 @@ async function sendWhatsAppMessage(phone: string, message: string, options?: Sen
         success: false,
         message: "Failed to send WhatsApp message",
         recipient: phone,
+        deliveryStatus: "failed",
       }
     }
   }
@@ -132,5 +158,6 @@ async function sendWhatsAppMessage(phone: string, message: string, options?: Sen
     message: "WhatsApp link generated",
     waLink,
     recipient: phone,
+    deliveryStatus: "accepted",
   }
 }

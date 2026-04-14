@@ -4,7 +4,12 @@ import os from "os"
 import path from "path"
 import { ObjectId } from "mongodb"
 import { getDatabase } from "@/lib/mongodb"
-import type { FormSubmission, MessageStatus, NormalizedSubmission } from "@/types"
+import type { DeliveryStatus, FormSubmission, MessageStatus, NormalizedSubmission } from "@/types"
+
+interface SendMeta {
+  messageId?: string | null
+  deliveryStatus?: DeliveryStatus
+}
 
 interface SubmissionDocument {
   _id?: ObjectId
@@ -22,6 +27,14 @@ interface SubmissionDocument {
   reminderStatus: MessageStatus
   reminderSentAt: Date | null
   reminderError: string | null
+  welcomeMessageId?: string | null
+  reminderMessageId?: string | null
+  welcomeDeliveryStatus?: DeliveryStatus
+  reminderDeliveryStatus?: DeliveryStatus
+  welcomeDeliveredAt?: Date | null
+  reminderDeliveredAt?: Date | null
+  welcomeDeliveryError?: string | null
+  reminderDeliveryError?: string | null
   createdAt: Date
   updatedAt: Date
 }
@@ -42,6 +55,14 @@ interface FileSubmissionRecord {
   reminderStatus: MessageStatus
   reminderSentAt: string | null
   reminderError: string | null
+  welcomeMessageId: string | null
+  reminderMessageId: string | null
+  welcomeDeliveryStatus: DeliveryStatus
+  reminderDeliveryStatus: DeliveryStatus
+  welcomeDeliveredAt: string | null
+  reminderDeliveredAt: string | null
+  welcomeDeliveryError: string | null
+  reminderDeliveryError: string | null
   createdAt: string
   updatedAt: string
 }
@@ -52,12 +73,40 @@ function shouldUseMongo() {
   return Boolean(process.env.MONGODB_URI)
 }
 
+function defaultDeliveryFromStatus(status: MessageStatus): DeliveryStatus {
+  if (status === "sent") return "accepted"
+  if (status === "failed") return "failed"
+  if (status === "not_scheduled") return "not_scheduled"
+  return "pending"
+}
+
+function statusFromDelivery(deliveryStatus: DeliveryStatus): MessageStatus {
+  if (deliveryStatus === "failed") return "failed"
+  if (deliveryStatus === "not_scheduled") return "not_scheduled"
+  if (deliveryStatus === "accepted" || deliveryStatus === "delivered" || deliveryStatus === "read") return "sent"
+  return "pending"
+}
+
+function normalizeDeliveryStatus(rawStatus: string): DeliveryStatus {
+  const normalized = (rawStatus || "").toLowerCase()
+  if (normalized === "accepted") return "accepted"
+  if (normalized === "sent") return "accepted"
+  if (normalized === "delivered") return "delivered"
+  if (normalized === "read") return "read"
+  if (normalized === "failed") return "failed"
+  if (normalized === "not_scheduled") return "not_scheduled"
+  if (normalized === "pending") return "pending"
+  return "unknown"
+}
+
 async function getCollection() {
   const db = await getDatabase()
   const collection = db.collection<SubmissionDocument>("submissions")
 
   await collection.createIndex({ externalId: 1 }, { unique: true })
   await collection.createIndex({ eventAt: 1, reminderStatus: 1 })
+  await collection.createIndex({ welcomeMessageId: 1 })
+  await collection.createIndex({ reminderMessageId: 1 })
 
   return collection
 }
@@ -76,8 +125,46 @@ function mapMongoSubmission(doc: SubmissionDocument): FormSubmission {
     reminderStatus: doc.reminderStatus,
     welcomeSentAt: doc.welcomeSentAt ? doc.welcomeSentAt.toISOString() : null,
     reminderSentAt: doc.reminderSentAt ? doc.reminderSentAt.toISOString() : null,
+    welcomeMessageId: doc.welcomeMessageId || null,
+    reminderMessageId: doc.reminderMessageId || null,
+    welcomeDeliveryStatus: doc.welcomeDeliveryStatus || defaultDeliveryFromStatus(doc.welcomeStatus),
+    reminderDeliveryStatus: doc.reminderDeliveryStatus || defaultDeliveryFromStatus(doc.reminderStatus),
+    welcomeDeliveredAt: doc.welcomeDeliveredAt ? doc.welcomeDeliveredAt.toISOString() : null,
+    reminderDeliveredAt: doc.reminderDeliveredAt ? doc.reminderDeliveredAt.toISOString() : null,
+    welcomeDeliveryError: doc.welcomeDeliveryError || null,
+    reminderDeliveryError: doc.reminderDeliveryError || null,
     createdAt: doc.createdAt.toISOString(),
     updatedAt: doc.updatedAt.toISOString(),
+  }
+}
+
+function normalizeFileRecord(input: Partial<FileSubmissionRecord> & Pick<FileSubmissionRecord, "id" | "externalId" | "name" | "phone" | "sourcePayload" | "createdAt" | "updatedAt">): FileSubmissionRecord {
+  return {
+    id: input.id,
+    externalId: input.externalId,
+    name: input.name,
+    phone: input.phone,
+    email: input.email,
+    city: input.city,
+    gender: input.gender,
+    eventAt: input.eventAt || null,
+    sourcePayload: input.sourcePayload,
+    welcomeStatus: input.welcomeStatus || "pending",
+    welcomeSentAt: input.welcomeSentAt || null,
+    welcomeError: input.welcomeError || null,
+    reminderStatus: input.reminderStatus || "pending",
+    reminderSentAt: input.reminderSentAt || null,
+    reminderError: input.reminderError || null,
+    welcomeMessageId: input.welcomeMessageId || null,
+    reminderMessageId: input.reminderMessageId || null,
+    welcomeDeliveryStatus: input.welcomeDeliveryStatus || defaultDeliveryFromStatus(input.welcomeStatus || "pending"),
+    reminderDeliveryStatus: input.reminderDeliveryStatus || defaultDeliveryFromStatus(input.reminderStatus || "pending"),
+    welcomeDeliveredAt: input.welcomeDeliveredAt || null,
+    reminderDeliveredAt: input.reminderDeliveredAt || null,
+    welcomeDeliveryError: input.welcomeDeliveryError || null,
+    reminderDeliveryError: input.reminderDeliveryError || null,
+    createdAt: input.createdAt,
+    updatedAt: input.updatedAt,
   }
 }
 
@@ -95,6 +182,14 @@ function mapFileSubmission(item: FileSubmissionRecord): FormSubmission {
     reminderStatus: item.reminderStatus,
     welcomeSentAt: item.welcomeSentAt,
     reminderSentAt: item.reminderSentAt,
+    welcomeMessageId: item.welcomeMessageId,
+    reminderMessageId: item.reminderMessageId,
+    welcomeDeliveryStatus: item.welcomeDeliveryStatus,
+    reminderDeliveryStatus: item.reminderDeliveryStatus,
+    welcomeDeliveredAt: item.welcomeDeliveredAt,
+    reminderDeliveredAt: item.reminderDeliveredAt,
+    welcomeDeliveryError: item.welcomeDeliveryError,
+    reminderDeliveryError: item.reminderDeliveryError,
     createdAt: item.createdAt,
     updatedAt: item.updatedAt,
   }
@@ -116,7 +211,11 @@ async function readFileStore() {
   if (!content.trim()) {
     return [] as FileSubmissionRecord[]
   }
-  return JSON.parse(content) as FileSubmissionRecord[]
+
+  const parsed = JSON.parse(content) as Array<Partial<FileSubmissionRecord>>
+  return parsed
+    .filter((item) => item.id && item.externalId && item.name && item.phone && item.createdAt && item.updatedAt)
+    .map((item) => normalizeFileRecord(item as FileSubmissionRecord))
 }
 
 async function writeFileStore(records: FileSubmissionRecord[]) {
@@ -136,6 +235,12 @@ export async function upsertSubmission(normalized: NormalizedSubmission, sourceP
         throw new Error("Existing submission missing _id")
       }
 
+      const nextReminderStatus: MessageStatus = normalized.eventAt
+        ? existing.reminderStatus === "not_scheduled"
+          ? "pending"
+          : existing.reminderStatus
+        : "not_scheduled"
+
       await collection.updateOne(
         { _id: existing._id },
         {
@@ -148,11 +253,8 @@ export async function upsertSubmission(normalized: NormalizedSubmission, sourceP
             eventAt: normalized.eventAt,
             sourcePayload,
             updatedAt: now,
-            reminderStatus: normalized.eventAt
-              ? existing.reminderStatus === "not_scheduled"
-                ? "pending"
-                : existing.reminderStatus
-              : "not_scheduled",
+            reminderStatus: nextReminderStatus,
+            reminderDeliveryStatus: defaultDeliveryFromStatus(nextReminderStatus),
           },
         },
       )
@@ -180,6 +282,14 @@ export async function upsertSubmission(normalized: NormalizedSubmission, sourceP
       reminderStatus: normalized.eventAt ? "pending" : "not_scheduled",
       reminderSentAt: null,
       reminderError: null,
+      welcomeMessageId: null,
+      reminderMessageId: null,
+      welcomeDeliveryStatus: "pending",
+      reminderDeliveryStatus: normalized.eventAt ? "pending" : "not_scheduled",
+      welcomeDeliveredAt: null,
+      reminderDeliveredAt: null,
+      welcomeDeliveryError: null,
+      reminderDeliveryError: null,
       createdAt: now,
       updatedAt: now,
     })
@@ -198,7 +308,13 @@ export async function upsertSubmission(normalized: NormalizedSubmission, sourceP
 
   if (existingIndex >= 0) {
     const existing = records[existingIndex]
-    const updated: FileSubmissionRecord = {
+    const nextReminderStatus: MessageStatus = normalized.eventAt
+      ? existing.reminderStatus === "not_scheduled"
+        ? "pending"
+        : existing.reminderStatus
+      : "not_scheduled"
+
+    const updated: FileSubmissionRecord = normalizeFileRecord({
       ...existing,
       name: normalized.name,
       phone: normalized.phone,
@@ -207,19 +323,17 @@ export async function upsertSubmission(normalized: NormalizedSubmission, sourceP
       gender: normalized.gender,
       eventAt: normalized.eventAt ? normalized.eventAt.toISOString() : null,
       sourcePayload,
-      reminderStatus: normalized.eventAt
-        ? existing.reminderStatus === "not_scheduled"
-          ? "pending"
-          : existing.reminderStatus
-        : "not_scheduled",
+      reminderStatus: nextReminderStatus,
+      reminderDeliveryStatus: defaultDeliveryFromStatus(nextReminderStatus),
       updatedAt: now,
-    }
+    })
+
     records[existingIndex] = updated
     await writeFileStore(records)
     return { submission: mapFileSubmission(updated), wasCreated: false }
   }
 
-  const created: FileSubmissionRecord = {
+  const created = normalizeFileRecord({
     id: randomUUID(),
     externalId: normalized.externalId,
     name: normalized.name,
@@ -235,9 +349,17 @@ export async function upsertSubmission(normalized: NormalizedSubmission, sourceP
     reminderStatus: normalized.eventAt ? "pending" : "not_scheduled",
     reminderSentAt: null,
     reminderError: null,
+    welcomeMessageId: null,
+    reminderMessageId: null,
+    welcomeDeliveryStatus: "pending",
+    reminderDeliveryStatus: normalized.eventAt ? "pending" : "not_scheduled",
+    welcomeDeliveredAt: null,
+    reminderDeliveredAt: null,
+    welcomeDeliveryError: null,
+    reminderDeliveryError: null,
     createdAt: now,
     updatedAt: now,
-  }
+  })
 
   records.push(created)
   await writeFileStore(records)
@@ -257,7 +379,9 @@ export async function listSubmissions() {
     .map(mapFileSubmission)
 }
 
-export async function markWelcomeStatus(id: string, success: boolean, errorMessage?: string) {
+export async function markWelcomeStatus(id: string, success: boolean, errorMessage?: string, meta?: SendMeta) {
+  const initialDelivery: DeliveryStatus = success ? meta?.deliveryStatus || "accepted" : "failed"
+
   if (shouldUseMongo()) {
     if (!ObjectId.isValid(id)) {
       throw new Error("Invalid submission id")
@@ -266,18 +390,21 @@ export async function markWelcomeStatus(id: string, success: boolean, errorMessa
     const collection = await getCollection()
     const now = new Date()
 
-    await collection.updateOne(
-      { _id: new ObjectId(id) },
-      {
-        $set: {
-          welcomeStatus: success ? "sent" : "failed",
-          welcomeSentAt: success ? now : null,
-          welcomeError: success ? null : errorMessage || "Failed to send welcome message",
-          updatedAt: now,
-        },
-      },
-    )
+    const updatePayload: Record<string, unknown> = {
+      welcomeStatus: success ? "sent" : "failed",
+      welcomeSentAt: success ? now : null,
+      welcomeError: success ? null : errorMessage || "Failed to send welcome message",
+      welcomeMessageId: meta?.messageId || null,
+      welcomeDeliveryStatus: initialDelivery,
+      welcomeDeliveryError: success ? null : errorMessage || "Failed to send welcome message",
+      updatedAt: now,
+    }
 
+    if (initialDelivery === "delivered" || initialDelivery === "read") {
+      updatePayload.welcomeDeliveredAt = now
+    }
+
+    await collection.updateOne({ _id: new ObjectId(id) }, { $set: updatePayload })
     return
   }
 
@@ -285,18 +412,26 @@ export async function markWelcomeStatus(id: string, success: boolean, errorMessa
   const now = new Date().toISOString()
   const updatedRecords: FileSubmissionRecord[] = records.map((item): FileSubmissionRecord => {
     if (item.id !== id) return item
-    return {
+
+    return normalizeFileRecord({
       ...item,
       welcomeStatus: success ? "sent" : "failed",
       welcomeSentAt: success ? now : null,
       welcomeError: success ? null : errorMessage || "Failed to send welcome message",
+      welcomeMessageId: meta?.messageId || null,
+      welcomeDeliveryStatus: initialDelivery,
+      welcomeDeliveryError: success ? null : errorMessage || "Failed to send welcome message",
+      welcomeDeliveredAt: initialDelivery === "delivered" || initialDelivery === "read" ? now : item.welcomeDeliveredAt,
       updatedAt: now,
-    }
+    })
   })
+
   await writeFileStore(updatedRecords)
 }
 
-export async function markReminderStatus(id: string, success: boolean, errorMessage?: string) {
+export async function markReminderStatus(id: string, success: boolean, errorMessage?: string, meta?: SendMeta) {
+  const initialDelivery: DeliveryStatus = success ? meta?.deliveryStatus || "accepted" : "failed"
+
   if (shouldUseMongo()) {
     if (!ObjectId.isValid(id)) {
       throw new Error("Invalid submission id")
@@ -305,18 +440,21 @@ export async function markReminderStatus(id: string, success: boolean, errorMess
     const collection = await getCollection()
     const now = new Date()
 
-    await collection.updateOne(
-      { _id: new ObjectId(id) },
-      {
-        $set: {
-          reminderStatus: success ? "sent" : "failed",
-          reminderSentAt: success ? now : null,
-          reminderError: success ? null : errorMessage || "Failed to send reminder",
-          updatedAt: now,
-        },
-      },
-    )
+    const updatePayload: Record<string, unknown> = {
+      reminderStatus: success ? "sent" : "failed",
+      reminderSentAt: success ? now : null,
+      reminderError: success ? null : errorMessage || "Failed to send reminder",
+      reminderMessageId: meta?.messageId || null,
+      reminderDeliveryStatus: initialDelivery,
+      reminderDeliveryError: success ? null : errorMessage || "Failed to send reminder",
+      updatedAt: now,
+    }
 
+    if (initialDelivery === "delivered" || initialDelivery === "read") {
+      updatePayload.reminderDeliveredAt = now
+    }
+
+    await collection.updateOne({ _id: new ObjectId(id) }, { $set: updatePayload })
     return
   }
 
@@ -324,14 +462,20 @@ export async function markReminderStatus(id: string, success: boolean, errorMess
   const now = new Date().toISOString()
   const updatedRecords: FileSubmissionRecord[] = records.map((item): FileSubmissionRecord => {
     if (item.id !== id) return item
-    return {
+
+    return normalizeFileRecord({
       ...item,
       reminderStatus: success ? "sent" : "failed",
       reminderSentAt: success ? now : null,
       reminderError: success ? null : errorMessage || "Failed to send reminder",
+      reminderMessageId: meta?.messageId || null,
+      reminderDeliveryStatus: initialDelivery,
+      reminderDeliveryError: success ? null : errorMessage || "Failed to send reminder",
+      reminderDeliveredAt: initialDelivery === "delivered" || initialDelivery === "read" ? now : item.reminderDeliveredAt,
       updatedAt: now,
-    }
+    })
   })
+
   await writeFileStore(updatedRecords)
 }
 
@@ -349,6 +493,9 @@ export async function markReminderPending(id: string) {
         $set: {
           reminderStatus: "pending",
           reminderError: null,
+          reminderDeliveryStatus: "pending",
+          reminderDeliveryError: null,
+          reminderDeliveredAt: null,
           updatedAt: new Date(),
         },
       },
@@ -361,14 +508,105 @@ export async function markReminderPending(id: string) {
   const now = new Date().toISOString()
   const updatedRecords: FileSubmissionRecord[] = records.map((item): FileSubmissionRecord => {
     if (item.id !== id) return item
-    return {
+
+    return normalizeFileRecord({
       ...item,
       reminderStatus: "pending",
       reminderError: null,
+      reminderDeliveryStatus: "pending",
+      reminderDeliveryError: null,
+      reminderDeliveredAt: null,
       updatedAt: now,
-    }
+    })
   })
   await writeFileStore(updatedRecords)
+}
+
+export async function updateDeliveryStatusByMessageId(messageId: string, rawStatus: string, errorMessage?: string) {
+  if (!messageId) return false
+
+  const deliveryStatus = normalizeDeliveryStatus(rawStatus)
+
+  if (shouldUseMongo()) {
+    const collection = await getCollection()
+    const now = new Date()
+
+    const matched = await collection.findOne({
+      $or: [{ welcomeMessageId: messageId }, { reminderMessageId: messageId }],
+    })
+
+    if (!matched || !matched._id) {
+      return false
+    }
+
+    if (matched.welcomeMessageId === messageId) {
+      const payload: Record<string, unknown> = {
+        welcomeDeliveryStatus: deliveryStatus,
+        welcomeDeliveryError: deliveryStatus === "failed" ? errorMessage || "Delivery failed" : null,
+        welcomeStatus: statusFromDelivery(deliveryStatus),
+        updatedAt: now,
+      }
+      if (deliveryStatus === "delivered" || deliveryStatus === "read") {
+        payload.welcomeDeliveredAt = now
+      }
+      await collection.updateOne({ _id: matched._id }, { $set: payload })
+      return true
+    }
+
+    if (matched.reminderMessageId === messageId) {
+      const payload: Record<string, unknown> = {
+        reminderDeliveryStatus: deliveryStatus,
+        reminderDeliveryError: deliveryStatus === "failed" ? errorMessage || "Delivery failed" : null,
+        reminderStatus: statusFromDelivery(deliveryStatus),
+        updatedAt: now,
+      }
+      if (deliveryStatus === "delivered" || deliveryStatus === "read") {
+        payload.reminderDeliveredAt = now
+      }
+      await collection.updateOne({ _id: matched._id }, { $set: payload })
+      return true
+    }
+
+    return false
+  }
+
+  const records = await readFileStore()
+  const now = new Date().toISOString()
+  let updatedAny = false
+
+  const updatedRecords: FileSubmissionRecord[] = records.map((item): FileSubmissionRecord => {
+    if (item.welcomeMessageId === messageId) {
+      updatedAny = true
+      return normalizeFileRecord({
+        ...item,
+        welcomeDeliveryStatus: deliveryStatus,
+        welcomeDeliveryError: deliveryStatus === "failed" ? errorMessage || "Delivery failed" : null,
+        welcomeStatus: statusFromDelivery(deliveryStatus),
+        welcomeDeliveredAt: deliveryStatus === "delivered" || deliveryStatus === "read" ? now : item.welcomeDeliveredAt,
+        updatedAt: now,
+      })
+    }
+
+    if (item.reminderMessageId === messageId) {
+      updatedAny = true
+      return normalizeFileRecord({
+        ...item,
+        reminderDeliveryStatus: deliveryStatus,
+        reminderDeliveryError: deliveryStatus === "failed" ? errorMessage || "Delivery failed" : null,
+        reminderStatus: statusFromDelivery(deliveryStatus),
+        reminderDeliveredAt: deliveryStatus === "delivered" || deliveryStatus === "read" ? now : item.reminderDeliveredAt,
+        updatedAt: now,
+      })
+    }
+
+    return item
+  })
+
+  if (updatedAny) {
+    await writeFileStore(updatedRecords)
+  }
+
+  return updatedAny
 }
 
 export async function getPendingReminderSubmissions(start: Date, end: Date) {

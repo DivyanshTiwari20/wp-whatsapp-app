@@ -1,4 +1,5 @@
 export type MessageStatus = "pending" | "sent" | "failed" | "not_scheduled"
+export type DeliveryStatus = "pending" | "accepted" | "delivered" | "read" | "failed" | "not_scheduled" | "unknown"
 
 export interface FormSubmission {
   id: string
@@ -13,6 +14,14 @@ export interface FormSubmission {
   reminderStatus: MessageStatus
   welcomeSentAt?: string | null
   reminderSentAt?: string | null
+  welcomeMessageId?: string | null
+  reminderMessageId?: string | null
+  welcomeDeliveryStatus?: DeliveryStatus
+  reminderDeliveryStatus?: DeliveryStatus
+  welcomeDeliveredAt?: string | null
+  reminderDeliveredAt?: string | null
+  welcomeDeliveryError?: string | null
+  reminderDeliveryError?: string | null
   createdAt?: string
   updatedAt?: string
   [key: string]: string | number | null | undefined
@@ -63,4 +72,6 @@ export interface SendMessageResponse {
   message: string
   recipient: string
   waLink?: string
+  messageId?: string
+  deliveryStatus?: DeliveryStatus
 }
