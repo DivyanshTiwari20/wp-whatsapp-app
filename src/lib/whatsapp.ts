@@ -72,11 +72,20 @@ export async function sendWhatsAppText(phone: string, message: string): Promise<
 }
 
 export async function sendWelcomeWhatsApp(phone: string, fallbackMessage: string, userName?: string) {
-  // We do not pass components here yet, because the current Meta template is configured for 0 parameters.
-  // Passing a parameter would cause Meta to instantly reject the API request.
   return sendWhatsAppMessage(phone, fallbackMessage, {
     templateName: process.env.WHATSAPP_WELCOME_TEMPLATE_NAME,
-    templateLanguage: process.env.WHATSAPP_TEMPLATE_LANGUAGE || "en"
+    templateLanguage: process.env.WHATSAPP_TEMPLATE_LANGUAGE || "en",
+    components: userName ? [
+      {
+        type: "body",
+        parameters: [
+          {
+            type: "text",
+            text: userName
+          }
+        ]
+      }
+    ] : undefined
   })
 }
 
