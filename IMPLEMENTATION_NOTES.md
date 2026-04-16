@@ -88,3 +88,10 @@
 
 ## Important note
 - If `MONGODB_URI` is missing, DB-backed routes return errors until configured.
+
+## Troubleshooting delivery
+- `"Message accepted by WhatsApp"` means Meta accepted the request, not that the user already received it.
+- To track real delivery (`delivered`, `read`, `failed`), configure Meta webhook callback to:
+  - `https://<your-domain>/api/webhook/whatsapp`
+  - verify token must match `WHATSAPP_WEBHOOK_VERIFY_TOKEN`
+- If using Meta test sender (`+1 555...`), only allow-listed recipient numbers can receive messages.

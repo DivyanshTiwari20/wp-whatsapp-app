@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
         eventAt: submission.eventAt ? new Date(submission.eventAt) : null,
       })
 
-      const result = await sendWelcomeWhatsApp(submission.phone, message)
+      const result = await sendWelcomeWhatsApp(submission.phone, message, submission.name)
       await markWelcomeStatus(submission.id, result.success, result.success ? undefined : result.message, {
         messageId: result.messageId,
         deliveryStatus: result.deliveryStatus,

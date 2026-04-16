@@ -7,7 +7,7 @@ function formatDate(eventAt?: Date | null) {
   if (!eventAt) return ""
 
   const timezone = process.env.APP_TIMEZONE || "Asia/Kolkata"
-  return new Intl.DateTimeFormat("en-IN", {
+  return new Intl.DateTimeFormat("en", {
     dateStyle: "medium",
     timeZone: timezone,
   }).format(eventAt)
@@ -17,7 +17,7 @@ function formatTime(eventAt?: Date | null) {
   if (!eventAt) return ""
 
   const timezone = process.env.APP_TIMEZONE || "Asia/Kolkata"
-  return new Intl.DateTimeFormat("en-IN", {
+  return new Intl.DateTimeFormat("en", {
     hour: "2-digit",
     minute: "2-digit",
     hour12: true,

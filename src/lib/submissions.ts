@@ -83,6 +83,7 @@ function defaultDeliveryFromStatus(status: MessageStatus): DeliveryStatus {
 function statusFromDelivery(deliveryStatus: DeliveryStatus): MessageStatus {
   if (deliveryStatus === "failed") return "failed"
   if (deliveryStatus === "not_scheduled") return "not_scheduled"
+  if (deliveryStatus === "held_for_quality_assessment") return "pending"
   if (deliveryStatus === "accepted" || deliveryStatus === "delivered" || deliveryStatus === "read") return "sent"
   return "pending"
 }
@@ -94,6 +95,7 @@ function normalizeDeliveryStatus(rawStatus: string): DeliveryStatus {
   if (normalized === "delivered") return "delivered"
   if (normalized === "read") return "read"
   if (normalized === "failed") return "failed"
+  if (normalized === "held_for_quality_assessment") return "held_for_quality_assessment"
   if (normalized === "not_scheduled") return "not_scheduled"
   if (normalized === "pending") return "pending"
   return "unknown"

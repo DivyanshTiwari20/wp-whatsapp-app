@@ -81,6 +81,8 @@ function statusBadge(status: string) {
       return <Badge variant="destructive">Failed</Badge>
     case "pending":
       return <Badge variant="secondary">Pending</Badge>
+    case "held_for_quality_assessment":
+      return <Badge className="bg-amber-600">Held (Quality)</Badge>
     case "not_scheduled":
       return <Badge variant="outline">Missing Event Date</Badge>
     default:

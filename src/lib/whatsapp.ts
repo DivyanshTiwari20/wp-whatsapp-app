@@ -3,20 +3,31 @@ import type { DeliveryStatus, SendMessageResponse } from "@/types"
 interface SendOptions {
   templateName?: string
   templateLanguage?: string
+  components?: any[]
 }
 
 function normalizePhone(phone: string) {
   const phoneNumber = phone.replace(/[^0-9]/g, "")
-  return phoneNumber.startsWith("91") ? phoneNumber : `91${phoneNumber}`
+  if (phoneNumber.length === 10) {
+    return `91${phoneNumber}`
+  }
+  if (phoneNumber.startsWith("0") && phoneNumber.length === 11) {
+    return `91${phoneNumber.substring(1)}`
+  }
+  return phoneNumber
 }
 
 function trimTrailingSlash(input: string) {
   return input.replace(/\/+$/, "")
 }
 
+function isHttpUrl(value: string) {
+  return /^https?:\/\//i.test(value)
+}
+
 function getMessagesEndpoint() {
-  const explicitEndpoint = process.env.WHATSAPP_MESSAGES_ENDPOINT
-  if (explicitEndpoint) {
+  const explicitEndpoint = (process.env.WHATSAPP_MESSAGES_ENDPOINT || "").trim()
+  if (explicitEndpoint && isHttpUrl(explicitEndpoint)) {
     return explicitEndpoint
   }
 
@@ -51,6 +62,7 @@ function normalizeApiStatus(status: unknown): DeliveryStatus {
   if (normalized === "read") return "read"
   if (normalized === "failed") return "failed"
   if (normalized === "sent") return "accepted"
+  if (normalized === "held_for_quality_assessment") return "held_for_quality_assessment"
 
   return "unknown"
 }
@@ -59,14 +71,27 @@ export async function sendWhatsAppText(phone: string, message: string): Promise<
   return sendWhatsAppMessage(phone, message)
 }
 
-export async function sendWelcomeWhatsApp(phone: string, fallbackMessage: string) {
+export async function sendWelcomeWhatsApp(phone: string, fallbackMessage: string, userName?: string) {
+  // If no userName is explicitly provided, we can try to extract it from fallbackMessage or just default it
+  // But ideally, the caller should pass userName.
   return sendWhatsAppMessage(phone, fallbackMessage, {
     templateName: process.env.WHATSAPP_WELCOME_TEMPLATE_NAME,
     templateLanguage: process.env.WHATSAPP_TEMPLATE_LANGUAGE || "en",
+    components: userName ? [
+      {
+        type: "body",
+        parameters: [
+          {
+            type: "text",
+            text: userName
+          }
+        ]
+      }
+    ] : undefined
   })
 }
 
-export async function sendReminderWhatsApp(phone: string, fallbackMessage: string) {
+export async function sendReminderWhatsApp(phone: string, fallbackMessage: string, userName?: string) {
   return sendWhatsAppMessage(phone, fallbackMessage, {
     templateName: process.env.WHATSAPP_REMINDER_TEMPLATE_NAME,
     templateLanguage: process.env.WHATSAPP_TEMPLATE_LANGUAGE || "en",
@@ -99,6 +124,9 @@ async function sendWhatsAppMessage(phone: string, message: string, options?: Sen
               language: {
                 code: options.templateLanguage || "en",
               },
+              ...(options.components && options.components.length > 0
+                ? { components: options.components }
+                : {}),
             },
           }
         : {
@@ -132,10 +160,16 @@ async function sendWhatsAppMessage(phone: string, message: string, options?: Sen
       const deliveryStatus = normalizeApiStatus(
         Array.isArray(data?.messages) ? data.messages[0]?.message_status : "accepted",
       )
+      const responseMessage =
+        deliveryStatus === "held_for_quality_assessment"
+          ? "Message held for quality assessment"
+          : deliveryStatus === "accepted"
+            ? "Message accepted by WhatsApp (delivery pending)"
+            : "Message accepted by WhatsApp"
 
       return {
         success: true,
-        message: "Message accepted by WhatsApp",
+        message: responseMessage,
         recipient: phone,
         messageId,
         deliveryStatus,

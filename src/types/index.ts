@@ -1,5 +1,13 @@
 export type MessageStatus = "pending" | "sent" | "failed" | "not_scheduled"
-export type DeliveryStatus = "pending" | "accepted" | "delivered" | "read" | "failed" | "not_scheduled" | "unknown"
+export type DeliveryStatus =
+  | "pending"
+  | "accepted"
+  | "delivered"
+  | "read"
+  | "failed"
+  | "not_scheduled"
+  | "held_for_quality_assessment"
+  | "unknown"
 
 export interface FormSubmission {
   id: string
