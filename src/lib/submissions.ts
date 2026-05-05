@@ -18,8 +18,10 @@ interface SubmissionDocument {
   phone: string
   email?: string
   city?: string
+  event?: string
   gender?: string
   eventAt: Date | null
+  infoSource?: string
   sourcePayload: unknown
   welcomeStatus: MessageStatus
   welcomeSentAt: Date | null
@@ -46,8 +48,10 @@ interface FileSubmissionRecord {
   phone: string
   email?: string
   city?: string
+  event?: string
   gender?: string
   eventAt: string | null
+  infoSource?: string
   sourcePayload: unknown
   welcomeStatus: MessageStatus
   welcomeSentAt: string | null
@@ -70,6 +74,14 @@ interface FileSubmissionRecord {
 const dataFilePath = path.join(process.env.LOCAL_STORE_PATH || os.tmpdir(), "whatsapp-contact-manager-submissions.json")
 
 function shouldUseMongo() {
+  const requireMongo = (process.env.REQUIRE_MONGODB || "").toLowerCase()
+  if (requireMongo === "1" || requireMongo === "true" || requireMongo === "yes") {
+    if (!process.env.MONGODB_URI) {
+      throw new Error("MongoDB is required (set MONGODB_URI).")
+    }
+    return true
+  }
+
   return Boolean(process.env.MONGODB_URI)
 }
 
@@ -121,8 +133,10 @@ function mapMongoSubmission(doc: SubmissionDocument): FormSubmission {
     phone: doc.phone,
     email: doc.email,
     city: doc.city,
+    event: doc.event,
     gender: doc.gender,
     eventAt: doc.eventAt ? doc.eventAt.toISOString() : null,
+    infoSource: doc.infoSource,
     welcomeStatus: doc.welcomeStatus,
     reminderStatus: doc.reminderStatus,
     welcomeSentAt: doc.welcomeSentAt ? doc.welcomeSentAt.toISOString() : null,
@@ -148,8 +162,10 @@ function normalizeFileRecord(input: Partial<FileSubmissionRecord> & Pick<FileSub
     phone: input.phone,
     email: input.email,
     city: input.city,
+    event: input.event,
     gender: input.gender,
     eventAt: input.eventAt || null,
+    infoSource: input.infoSource,
     sourcePayload: input.sourcePayload,
     welcomeStatus: input.welcomeStatus || "pending",
     welcomeSentAt: input.welcomeSentAt || null,
@@ -178,8 +194,10 @@ function mapFileSubmission(item: FileSubmissionRecord): FormSubmission {
     phone: item.phone,
     email: item.email,
     city: item.city,
+    event: item.event,
     gender: item.gender,
     eventAt: item.eventAt,
+    infoSource: item.infoSource,
     welcomeStatus: item.welcomeStatus,
     reminderStatus: item.reminderStatus,
     welcomeSentAt: item.welcomeSentAt,
@@ -251,8 +269,10 @@ export async function upsertSubmission(normalized: NormalizedSubmission, sourceP
             phone: normalized.phone,
             email: normalized.email,
             city: normalized.city,
+            event: normalized.event,
             gender: normalized.gender,
             eventAt: normalized.eventAt,
+            infoSource: normalized.infoSource,
             sourcePayload,
             updatedAt: now,
             reminderStatus: nextReminderStatus,
@@ -275,8 +295,10 @@ export async function upsertSubmission(normalized: NormalizedSubmission, sourceP
       phone: normalized.phone,
       email: normalized.email,
       city: normalized.city,
+      event: normalized.event,
       gender: normalized.gender,
       eventAt: normalized.eventAt,
+      infoSource: normalized.infoSource,
       sourcePayload,
       welcomeStatus: "pending",
       welcomeSentAt: null,
@@ -322,8 +344,10 @@ export async function upsertSubmission(normalized: NormalizedSubmission, sourceP
       phone: normalized.phone,
       email: normalized.email,
       city: normalized.city,
+      event: normalized.event,
       gender: normalized.gender,
       eventAt: normalized.eventAt ? normalized.eventAt.toISOString() : null,
+      infoSource: normalized.infoSource,
       sourcePayload,
       reminderStatus: nextReminderStatus,
       reminderDeliveryStatus: defaultDeliveryFromStatus(nextReminderStatus),
@@ -342,8 +366,10 @@ export async function upsertSubmission(normalized: NormalizedSubmission, sourceP
     phone: normalized.phone,
     email: normalized.email,
     city: normalized.city,
+    event: normalized.event,
     gender: normalized.gender,
     eventAt: normalized.eventAt ? normalized.eventAt.toISOString() : null,
+    infoSource: normalized.infoSource,
     sourcePayload,
     welcomeStatus: "pending",
     welcomeSentAt: null,

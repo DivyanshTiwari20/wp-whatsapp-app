@@ -16,8 +16,10 @@ export interface FormSubmission {
   phone: string
   email?: string
   city?: string
+  event?: string
   gender?: string
   eventAt?: string | null
+  infoSource?: string
   welcomeStatus: MessageStatus
   reminderStatus: MessageStatus
   welcomeSentAt?: string | null
@@ -41,8 +43,10 @@ export interface NormalizedSubmission {
   phone: string
   email?: string
   city?: string
+  event?: string
   gender?: string
   eventAt: Date | null
+  infoSource?: string
   rawEventValue?: string
 }
 
@@ -68,6 +72,18 @@ export interface FilterState {
   status: string
   eventFrom: string
   eventTo: string
+}
+
+export interface City {
+  id: string
+  name: string
+}
+
+export interface Event {
+  id: string
+  name: string
+  cityId: string
+  isActive: boolean
 }
 
 export interface SendMessageRequest {

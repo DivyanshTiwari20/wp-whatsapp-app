@@ -3,7 +3,17 @@ import type { DeliveryStatus, SendMessageResponse } from "@/types"
 interface SendOptions {
   templateName?: string
   templateLanguage?: string
-  components?: any[]
+  components?: unknown[]
+}
+
+function buildBodyComponents(params: Array<string | undefined | null>) {
+  const texts = params.map((value) => (value || "").toString().trim())
+  return [
+    {
+      type: "body",
+      parameters: texts.map((text) => ({ type: "text", text })),
+    },
+  ]
 }
 
 function normalizePhone(phone: string) {
@@ -71,17 +81,27 @@ export async function sendWhatsAppText(phone: string, message: string): Promise<
   return sendWhatsAppMessage(phone, message)
 }
 
-export async function sendWelcomeWhatsApp(phone: string, fallbackMessage: string, userName?: string) {
+export async function sendWelcomeWhatsApp(
+  phone: string,
+  fallbackMessage: string,
+  variables?: { name?: string; event?: string; city?: string },
+) {
   return sendWhatsAppMessage(phone, fallbackMessage, {
     templateName: process.env.WHATSAPP_WELCOME_TEMPLATE_NAME,
-    templateLanguage: process.env.WHATSAPP_TEMPLATE_LANGUAGE || "en"
+    templateLanguage: process.env.WHATSAPP_TEMPLATE_LANGUAGE || "en",
+    components: buildBodyComponents([variables?.name, variables?.event, variables?.city]),
   })
 }
 
-export async function sendReminderWhatsApp(phone: string, fallbackMessage: string, userName?: string) {
+export async function sendReminderWhatsApp(
+  phone: string,
+  fallbackMessage: string,
+  variables?: { name?: string; event?: string; city?: string; schedule?: string },
+) {
   return sendWhatsAppMessage(phone, fallbackMessage, {
     templateName: process.env.WHATSAPP_REMINDER_TEMPLATE_NAME,
     templateLanguage: process.env.WHATSAPP_TEMPLATE_LANGUAGE || "en",
+    components: buildBodyComponents([variables?.name, variables?.event, variables?.city, variables?.schedule]),
   })
 }
 

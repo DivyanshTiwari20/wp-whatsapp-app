@@ -5,7 +5,9 @@ const defaultNameCandidates = ["name", "full name", "first name"]
 const defaultPhoneCandidates = ["phone", "mobile", "tel", "contact", "whatsapp"]
 const defaultEmailCandidates = ["email", "e-mail"]
 const defaultCityCandidates = ["city", "location", "town", "place"]
+const defaultEventNameCandidates = ["event", "event name"]
 const defaultGenderCandidates = ["gender", "sex"]
+const defaultInfoSourceCandidates = ["where did you get", "source", "reference", "heard about", "platform"]
 
 function toSafeString(value: unknown) {
   if (typeof value === "string") return value.trim()
@@ -163,11 +165,13 @@ export function normalizeWordPressPayload(payload: unknown): NormalizedSubmissio
   const phone = pickFieldValue(flattened, defaultPhoneCandidates)
   const email = pickFieldValue(flattened, defaultEmailCandidates)
   const city = pickFieldValue(flattened, defaultCityCandidates)
+  const event = pickFieldValue(flattened, defaultEventNameCandidates)
   const gender = pickFieldValue(flattened, defaultGenderCandidates)
+  const infoSource = pickFieldValue(flattened, defaultInfoSourceCandidates)
 
   const { eventAt, rawEventValue } = detectEventDate(flattened)
 
-  const externalId = buildExternalId(safePayload, [name, phone, email, rawEventValue])
+  const externalId = buildExternalId(safePayload, [name, phone, email, city, event, rawEventValue])
 
   return {
     externalId,
@@ -175,8 +179,10 @@ export function normalizeWordPressPayload(payload: unknown): NormalizedSubmissio
     phone,
     email,
     city,
+    event,
     gender,
     eventAt,
+    infoSource,
     rawEventValue,
   }
 }

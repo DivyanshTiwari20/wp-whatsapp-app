@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import Link from "next/link"
 import {
   RefreshCw,
   Send,
@@ -274,6 +275,9 @@ export default function Dashboard() {
             <Button variant="outline" size="sm" onClick={loadSubmissions} disabled={loading}>
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
               Refresh
+            </Button>
+            <Button asChild variant="outline" size="sm">
+              <Link href="/admin/events">Manage Events</Link>
             </Button>
             <Button variant="outline" size="sm" onClick={syncWordPress} disabled={loading}>
               Sync WordPress

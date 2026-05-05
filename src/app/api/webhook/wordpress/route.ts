@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getWelcomeMessage } from "@/lib/templates"
 import { markWelcomeStatus, upsertSubmission } from "@/lib/submissions"
+import { validateEventSelection } from "@/lib/events"
 import { sendWelcomeWhatsApp } from "@/lib/whatsapp"
 import { normalizeWordPressPayload } from "@/lib/wordpress"
 
@@ -68,6 +69,17 @@ export async function POST(request: NextRequest) {
       return jsonWithCors(request, { error: "Phone number missing in payload" }, { status: 400 })
     }
 
+    if (normalized.city && normalized.event) {
+      const validation = await validateEventSelection({ cityName: normalized.city, eventName: normalized.event })
+      if (!validation.ok) {
+        return jsonWithCors(
+          request,
+          { success: false, error: "Selected event is not active. Please choose another." },
+          { status: 400 },
+        )
+      }
+    }
+
     const { submission } = await upsertSubmission(normalized, payload)
 
     if (submission.welcomeStatus !== "sent") {
@@ -76,7 +88,11 @@ export async function POST(request: NextRequest) {
         eventAt: submission.eventAt ? new Date(submission.eventAt) : null,
       })
 
-      const result = await sendWelcomeWhatsApp(submission.phone, message, submission.name)
+      const result = await sendWelcomeWhatsApp(submission.phone, message, {
+        name: submission.name,
+        event: submission.event || "",
+        city: submission.city || "",
+      })
       await markWelcomeStatus(submission.id, result.success, result.success ? undefined : result.message, {
         messageId: result.messageId,
         deliveryStatus: result.deliveryStatus,

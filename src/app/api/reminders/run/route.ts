@@ -3,6 +3,19 @@ import { getReminderMessage } from "@/lib/templates"
 import { getPendingReminderSubmissions, markReminderStatus } from "@/lib/submissions"
 import { sendReminderWhatsApp } from "@/lib/whatsapp"
 
+function formatSchedule(iso?: string | null) {
+  if (!iso) return ""
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return ""
+
+  const timeZone = process.env.APP_TIMEZONE || "Asia/Kolkata"
+  return new Intl.DateTimeFormat("en-IN", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone,
+  }).format(date)
+}
+
 function isAuthorized(request: NextRequest) {
   const expectedSecret = process.env.CRON_SECRET
   if (!expectedSecret) {
@@ -18,20 +31,43 @@ function isAuthorized(request: NextRequest) {
 
 async function runReminderDispatch() {
   const now = new Date()
-  const start = new Date(now.getTime() + 24 * 60 * 60 * 1000)
-  const end = new Date(now.getTime() + 48 * 60 * 60 * 1000)
+  const targetHours = Number(process.env.REMINDER_TARGET_HOURS || "24")
+  const windowMinutes = Number(process.env.REMINDER_WINDOW_MINUTES || "90")
+  const sendIfLate = (process.env.REMINDER_SEND_IF_WITHIN_TARGET || "").toLowerCase()
+
+  const targetMs = targetHours * 60 * 60 * 1000
+  const windowMs = windowMinutes * 60 * 1000
+
+  // Select events that are ~24h away (tight window for cron reliability).
+  // If cron runs every hour, a 90-minute window avoids misses.
+  const start = new Date(now.getTime() + targetMs - windowMs / 2)
+  const end = new Date(now.getTime() + targetMs + windowMs / 2)
 
   const targets = await getPendingReminderSubmissions(start, end)
+  const allowLateSends = sendIfLate === "1" || sendIfLate === "true" || sendIfLate === "yes"
+
+  // Optional: if the user registers late (event is < 24h away), send the reminder immediately.
+  const lateTargets = allowLateSends
+    ? await getPendingReminderSubmissions(now, new Date(now.getTime() + targetMs))
+    : []
+
+  const allTargets = allowLateSends ? [...targets, ...lateTargets] : targets
+  const uniqueTargets = Array.from(new Map(allTargets.map((t) => [t.id, t])).values())
   const outcomes: Array<{ submissionId: string; success: boolean; message: string; messageId?: string; deliveryStatus?: string }> = []
 
-  for (const submission of targets) {
+  for (const submission of uniqueTargets) {
     try {
       const message = getReminderMessage({
         name: submission.name,
         eventAt: submission.eventAt ? new Date(submission.eventAt) : null,
       })
 
-      const result = await sendReminderWhatsApp(submission.phone, message)
+      const result = await sendReminderWhatsApp(submission.phone, message, {
+        name: submission.name,
+        event: submission.event || "",
+        city: submission.city || "",
+        schedule: formatSchedule(submission.eventAt || null),
+      })
       await markReminderStatus(submission.id, result.success, result.success ? undefined : result.message, {
         messageId: result.messageId,
         deliveryStatus: result.deliveryStatus,
