@@ -1,4 +1,4 @@
-import { MongoClient } from "mongodb"
+import { MongoClient, ServerApiVersion } from "mongodb"
 
 type GlobalMongo = typeof globalThis & {
   _mongoClientPromise?: Promise<MongoClient>
@@ -13,7 +13,16 @@ export async function getDatabase() {
   }
 
   if (!globalMongo._mongoClientPromise) {
-    const client = new MongoClient(uri)
+    const client = new MongoClient(uri, {
+      serverApi: {
+        version: ServerApiVersion.v1,
+        strict: true,
+        deprecationErrors: true,
+      },
+      tls: true,
+      connectTimeoutMS: 10000,
+      socketTimeoutMS: 30000,
+    })
     globalMongo._mongoClientPromise = client.connect()
   }
 

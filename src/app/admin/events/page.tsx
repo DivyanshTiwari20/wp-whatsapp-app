@@ -22,8 +22,10 @@ import type { City, Event } from "@/types"
 export default function AdminEventsPage() {
   const [cities, setCities] = useState<City[]>([])
   const [events, setEvents] = useState<Event[]>([])
-  const [loading, setLoading] = useState(false)
+  const [initialLoading, setInitialLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string>("")
+  const [fetchError, setFetchError] = useState<string>("")
 
   const [createCityOpen, setCreateCityOpen] = useState(false)
   const [newCityName, setNewCityName] = useState("")
@@ -49,9 +51,10 @@ export default function AdminEventsPage() {
     return map
   }, [events])
 
-  async function loadAll() {
-    setLoading(true)
-    setError("")
+  // Background data fetch — never blocks create operations
+  async function loadAll(isInitial = false) {
+    if (isInitial) setInitialLoading(true)
+    setFetchError("")
     try {
       const [citiesRes, eventsRes] = await Promise.all([fetch("/api/cities"), fetch("/api/events")])
       const citiesData = await citiesRes.json()
@@ -63,20 +66,22 @@ export default function AdminEventsPage() {
       setCities(Array.isArray(citiesData) ? citiesData : [])
       setEvents(Array.isArray(eventsData) ? eventsData : [])
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load data")
+      const msg = e instanceof Error ? e.message : "Failed to load data"
+      setFetchError(msg)
+      console.error("Background fetch failed:", msg)
     } finally {
-      setLoading(false)
+      if (isInitial) setInitialLoading(false)
     }
   }
 
   useEffect(() => {
-    loadAll()
+    loadAll(true)
   }, [])
 
   async function createCity() {
     const name = newCityName.trim()
     if (!name) return
-    setLoading(true)
+    setSaving(true)
     setError("")
     try {
       const res = await fetch("/api/city", {
@@ -87,20 +92,29 @@ export default function AdminEventsPage() {
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data?.error || "Failed to create city")
 
+      // Optimistically add the city to local state
+      const created: City = data
+      setCities((prev) => {
+        const exists = prev.some((c) => c.id === created.id)
+        return exists ? prev : [...prev, created]
+      })
+
       setCreateCityOpen(false)
       setNewCityName("")
-      await loadAll()
+
+      // Refresh in the background (non-blocking)
+      loadAll()
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to create city")
     } finally {
-      setLoading(false)
+      setSaving(false)
     }
   }
 
   async function createEvent() {
     const name = newEventName.trim()
     if (!name || !newEventCityId) return
-    setLoading(true)
+    setSaving(true)
     setError("")
     try {
       const res = await fetch("/api/event", {
@@ -111,14 +125,23 @@ export default function AdminEventsPage() {
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data?.error || "Failed to create event")
 
+      // Optimistically add the event to local state
+      const created: Event = data
+      setEvents((prev) => {
+        const exists = prev.some((e) => e.id === created.id)
+        return exists ? prev : [...prev, created]
+      })
+
       setCreateEventOpen(false)
       setNewEventName("")
       setNewEventCityId("")
-      await loadAll()
+
+      // Refresh in the background (non-blocking)
+      loadAll()
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to create event")
     } finally {
-      setLoading(false)
+      setSaving(false)
     }
   }
 
@@ -151,7 +174,7 @@ export default function AdminEventsPage() {
                 </Link>
               </Button>
               <h1 className="text-xl font-semibold text-gray-900">Cities & Events</h1>
-              {loading ? <Loader2 className="h-4 w-4 animate-spin text-gray-500" /> : null}
+              {initialLoading || saving ? <Loader2 className="h-4 w-4 animate-spin text-gray-500" /> : null}
             </div>
             <p className="text-sm text-gray-500">
               These control what the WordPress form shows. Only <span className="font-medium">Active</span> events appear
@@ -159,11 +182,11 @@ export default function AdminEventsPage() {
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => setCreateCityOpen(true)} disabled={loading}>
+            <Button variant="outline" onClick={() => setCreateCityOpen(true)}>
               <Plus className="h-4 w-4" />
               New City
             </Button>
-            <Button onClick={() => setCreateEventOpen(true)} disabled={loading || cities.length === 0}>
+            <Button onClick={() => setCreateEventOpen(true)} disabled={cities.length === 0}>
               <Plus className="h-4 w-4" />
               New Event
             </Button>
@@ -217,7 +240,7 @@ export default function AdminEventsPage() {
                   <p className="text-sm font-medium text-gray-900">No cities yet</p>
                   <p className="text-sm text-gray-500">Create your first city to start adding events.</p>
                 </div>
-                <Button onClick={() => setCreateCityOpen(true)} disabled={loading}>
+                <Button onClick={() => setCreateCityOpen(true)}>
                   <Plus className="h-4 w-4" />
                   Create City
                 </Button>
@@ -261,7 +284,6 @@ export default function AdminEventsPage() {
                           setNewEventCityId(city.id)
                           setCreateEventOpen(true)
                         }}
-                        disabled={loading}
                       >
                         <Plus className="h-4 w-4" />
                         Add Event
@@ -319,7 +341,7 @@ export default function AdminEventsPage() {
             <Button variant="outline" onClick={() => setCreateCityOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={createCity} disabled={loading || !newCityName.trim()}>
+            <Button onClick={createCity} disabled={saving || !newCityName.trim()}>
               Create
             </Button>
           </DialogFooter>
@@ -364,7 +386,7 @@ export default function AdminEventsPage() {
             <Button variant="outline" onClick={() => setCreateEventOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={createEvent} disabled={loading || !newEventName.trim() || !newEventCityId}>
+            <Button onClick={createEvent} disabled={saving || !newEventName.trim() || !newEventCityId}>
               Create
             </Button>
           </DialogFooter>
