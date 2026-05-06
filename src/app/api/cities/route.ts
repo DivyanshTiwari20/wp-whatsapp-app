@@ -11,7 +11,11 @@ export async function OPTIONS(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    const cities = await listCities()
+    const { searchParams } = new URL(request.url)
+    const active = (searchParams.get("active") || "").toLowerCase()
+    const onlyActive = active === "1" || active === "true"
+
+    const cities = await listCities({ onlyActive })
     const response = NextResponse.json(cities)
     const headers = getCorsHeaders(request)
     Object.entries(headers).forEach(([k, v]) => response.headers.set(k, v))

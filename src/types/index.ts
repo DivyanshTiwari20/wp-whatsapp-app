@@ -77,6 +77,7 @@ export interface FilterState {
 export interface City {
   id: string
   name: string
+  isActive: boolean
 }
 
 export interface Event {

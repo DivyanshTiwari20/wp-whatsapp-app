@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { Plus, Building2, CalendarDays, ArrowLeft, Loader2 } from "lucide-react"
+import { Plus, Building2, CalendarDays, ArrowLeft, Loader2, Pencil, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -33,6 +33,14 @@ export default function AdminEventsPage() {
   const [createEventOpen, setCreateEventOpen] = useState(false)
   const [newEventName, setNewEventName] = useState("")
   const [newEventCityId, setNewEventCityId] = useState<string>("")
+
+  const [editingCity, setEditingCity] = useState<City | null>(null)
+  const [editCityName, setEditCityName] = useState("")
+  const [deletingCity, setDeletingCity] = useState<City | null>(null)
+
+  const [editingEvent, setEditingEvent] = useState<Event | null>(null)
+  const [editEventName, setEditEventName] = useState("")
+  const [deletingEvent, setDeletingEvent] = useState<Event | null>(null)
 
   const activeCount = useMemo(() => events.filter((e) => e.isActive).length, [events])
   const inactiveCount = useMemo(() => events.filter((e) => !e.isActive).length, [events])
@@ -161,6 +169,107 @@ export default function AdminEventsPage() {
     }
   }
 
+  async function toggleCity(city: City, next: boolean) {
+    setError("")
+    setCities((prev) => prev.map((c) => (c.id === city.id ? { ...c, isActive: next } : c)))
+
+    const res = await fetch(`/api/city/${city.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isActive: next }),
+    })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      setError(data?.error || "Failed to update city")
+      await loadAll()
+    }
+  }
+
+  async function updateCity() {
+    if (!editingCity || !editCityName.trim()) return
+    setSaving(true)
+    setError("")
+    try {
+      const res = await fetch(`/api/city/${editingCity.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: editCityName.trim() }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || "Failed to update city")
+
+      setCities((prev) => prev.map((c) => (c.id === editingCity.id ? { ...c, name: editCityName.trim() } : c)))
+      setEditingCity(null)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to update city")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function deleteCity() {
+    if (!deletingCity) return
+    setSaving(true)
+    setError("")
+    try {
+      const res = await fetch(`/api/city/${deletingCity.id}`, {
+        method: "DELETE",
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || "Failed to delete city")
+
+      setCities((prev) => prev.filter((c) => c.id !== deletingCity.id))
+      setDeletingCity(null)
+      loadAll() // reload events just in case
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to delete city")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function updateEvent() {
+    if (!editingEvent || !editEventName.trim()) return
+    setSaving(true)
+    setError("")
+    try {
+      const res = await fetch(`/api/event/${editingEvent.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: editEventName.trim() }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || "Failed to update event")
+
+      setEvents((prev) => prev.map((e) => (e.id === editingEvent.id ? { ...e, name: editEventName.trim() } : e)))
+      setEditingEvent(null)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to update event")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function deleteEvent() {
+    if (!deletingEvent) return
+    setSaving(true)
+    setError("")
+    try {
+      const res = await fetch(`/api/event/${deletingEvent.id}`, {
+        method: "DELETE",
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data?.error || "Failed to delete event")
+
+      setEvents((prev) => prev.filter((e) => e.id !== deletingEvent.id))
+      setDeletingEvent(null)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to delete event")
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="border-b bg-white sticky top-0 z-10">
@@ -246,12 +355,45 @@ export default function AdminEventsPage() {
                 </Button>
               </div>
             ) : (
-              <div className="flex flex-wrap gap-2">
+              <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {cities.map((city) => (
-                  <Badge key={city.id} variant="secondary" className="py-1.5">
-                    <Building2 className="h-3.5 w-3.5 mr-1" />
-                    {city.name}
-                  </Badge>
+                  <div key={city.id} className="flex items-center justify-between border rounded-md px-3 py-2 bg-gray-50">
+                    <div className="flex items-center gap-2">
+                      <Building2 className="h-4 w-4 text-gray-400" />
+                      <div className="leading-tight">
+                        <div className="text-sm font-medium text-gray-900">{city.name}</div>
+                        <div className="text-xs text-gray-500">
+                          {city.isActive !== false ? "Active" : "Inactive"}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        checked={city.isActive !== false}
+                        onCheckedChange={(v) => toggleCity(city, Boolean(v))}
+                        title="Toggle Active Status"
+                      />
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={() => {
+                          setEditCityName(city.name)
+                          setEditingCity(city)
+                        }}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                        onClick={() => setDeletingCity(city)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
                 ))}
               </div>
             )}
@@ -309,9 +451,30 @@ export default function AdminEventsPage() {
                               </div>
                             </div>
 
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs text-gray-500">Active</span>
-                              <Checkbox checked={event.isActive} onCheckedChange={(v) => toggleEvent(event, Boolean(v))} />
+                            <div className="flex items-center gap-1">
+                              <div className="flex items-center gap-2 mr-2">
+                                <span className="text-xs text-gray-500">Active</span>
+                                <Checkbox checked={event.isActive} onCheckedChange={(v) => toggleEvent(event, Boolean(v))} />
+                              </div>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => {
+                                  setEditEventName(event.name)
+                                  setEditingEvent(event)
+                                }}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                onClick={() => setDeletingEvent(event)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
                             </div>
                           </div>
                         ))}
@@ -388,6 +551,92 @@ export default function AdminEventsPage() {
             </Button>
             <Button onClick={createEvent} disabled={saving || !newEventName.trim() || !newEventCityId}>
               Create
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!editingCity} onOpenChange={(open) => !open && setEditingCity(null)}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle>Edit City</DialogTitle>
+            <DialogDescription>Update the name of the city.</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700">City name</label>
+            <Input value={editCityName} onChange={(e) => setEditCityName(e.target.value)} />
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingCity(null)}>
+              Cancel
+            </Button>
+            <Button onClick={updateCity} disabled={saving || !editCityName.trim() || editCityName === editingCity?.name}>
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!deletingCity} onOpenChange={(open) => !open && setDeletingCity(null)}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle>Delete City</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete <strong>{deletingCity?.name}</strong>? This will not delete its associated events, but they might become orphaned.
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeletingCity(null)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={deleteCity} disabled={saving}>
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!editingEvent} onOpenChange={(open) => !open && setEditingEvent(null)}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle>Edit Event</DialogTitle>
+            <DialogDescription>Update the name of the event.</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700">Event name</label>
+            <Input value={editEventName} onChange={(e) => setEditEventName(e.target.value)} />
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingEvent(null)}>
+              Cancel
+            </Button>
+            <Button onClick={updateEvent} disabled={saving || !editEventName.trim() || editEventName === editingEvent?.name}>
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!deletingEvent} onOpenChange={(open) => !open && setDeletingEvent(null)}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle>Delete Event</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete <strong>{deletingEvent?.name}</strong>?
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeletingEvent(null)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={deleteEvent} disabled={saving}>
+              Delete
             </Button>
           </DialogFooter>
         </DialogContent>

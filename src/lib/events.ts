@@ -262,3 +262,74 @@ export async function validateEventSelection(input: { cityName: string; eventNam
   return { ok: true as const }
 }
 
+export async function updateEvent(id: string, name: string): Promise<Event> {
+  const trimmed = name.trim()
+  if (!trimmed) {
+    throw new Error("Event name is required")
+  }
+  if (!ObjectId.isValid(id)) {
+    throw new Error("Invalid event id")
+  }
+
+  const nameLower = normalizeNameLower(trimmed)
+
+  if (shouldUseMongo()) {
+    const collection = await getCollection()
+    const now = new Date()
+
+    const currentEvent = await collection.findOne({ _id: new ObjectId(id) })
+    if (!currentEvent) {
+      throw new Error("Event not found")
+    }
+
+    const existing = await collection.findOne({ cityId: currentEvent.cityId, nameLower, _id: { $ne: new ObjectId(id) } })
+    if (existing) {
+      throw new Error("Event with this name already exists in this city")
+    }
+
+    await collection.updateOne({ _id: new ObjectId(id) }, { $set: { name: trimmed, nameLower, updatedAt: now } })
+    const updated = await collection.findOne({ _id: new ObjectId(id) })
+    if (!updated) {
+      throw new Error("Event not found after update")
+    }
+    return mapMongoEvent(updated)
+  }
+
+  const records = await readFileStore()
+  const idx = records.findIndex((item) => item.id === id)
+  if (idx < 0) {
+    throw new Error("Event not found")
+  }
+  
+  const currentEvent = records[idx]
+  const existing = records.find((item) => item.cityId === currentEvent.cityId && item.nameLower === nameLower && item.id !== id)
+  if (existing) {
+    throw new Error("Event with this name already exists in this city")
+  }
+
+  const now = new Date().toISOString()
+  const updated: FileEventRecord = { ...currentEvent, name: trimmed, nameLower, updatedAt: now }
+  records[idx] = updated
+  await writeFileStore(records)
+  return mapFileEvent(updated)
+}
+
+export async function deleteEvent(id: string): Promise<void> {
+  if (!ObjectId.isValid(id)) {
+    throw new Error("Invalid event id")
+  }
+
+  if (shouldUseMongo()) {
+    const collection = await getCollection()
+    await collection.deleteOne({ _id: new ObjectId(id) })
+    return
+  }
+
+  const records = await readFileStore()
+  const newRecords = records.filter((item) => item.id !== id)
+  if (newRecords.length === records.length) {
+    throw new Error("Event not found")
+  }
+  await writeFileStore(newRecords)
+}
+

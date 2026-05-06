@@ -8,6 +8,7 @@ interface CityDocument {
   _id?: ObjectId
   name: string
   nameLower: string
+  isActive: boolean
   createdAt: Date
   updatedAt: Date
 }
@@ -16,6 +17,7 @@ interface FileCityRecord {
   id: string
   name: string
   nameLower: string
+  isActive: boolean
   createdAt: string
   updatedAt: string
 }
@@ -82,6 +84,7 @@ function mapMongoCity(doc: CityDocument): City {
   return {
     id: doc._id ? doc._id.toString() : doc.nameLower,
     name: doc.name,
+    isActive: doc.isActive !== undefined ? doc.isActive : true, // default for existing docs
   }
 }
 
@@ -89,18 +92,25 @@ function mapFileCity(doc: FileCityRecord): City {
   return {
     id: doc.id,
     name: doc.name,
+    isActive: doc.isActive !== undefined ? doc.isActive : true, // default for existing records
   }
 }
 
-export async function listCities(): Promise<City[]> {
+export async function listCities(options?: { onlyActive?: boolean }): Promise<City[]> {
+  const onlyActive = Boolean(options?.onlyActive)
+
   if (shouldUseMongo()) {
     const collection = await getCollection()
-    const items = await collection.find({}).sort({ nameLower: 1 }).toArray()
+    const filter = onlyActive ? { isActive: true } : {}
+    const items = await collection.find(filter).sort({ nameLower: 1 }).toArray()
     return items.map(mapMongoCity)
   }
 
   const records = await readFileStore()
-  return records.sort((a, b) => a.nameLower.localeCompare(b.nameLower)).map(mapFileCity)
+  return records
+    .filter((item) => (onlyActive ? item.isActive !== false : true))
+    .sort((a, b) => a.nameLower.localeCompare(b.nameLower))
+    .map(mapFileCity)
 }
 
 export async function createCity(name: string): Promise<City> {
@@ -123,6 +133,7 @@ export async function createCity(name: string): Promise<City> {
     const result = await collection.insertOne({
       name: trimmed,
       nameLower,
+      isActive: true,
       createdAt: now,
       updatedAt: now,
     })
@@ -146,6 +157,7 @@ export async function createCity(name: string): Promise<City> {
     id: new ObjectId().toString(),
     name: trimmed,
     nameLower,
+    isActive: true,
     createdAt: now,
     updatedAt: now,
   }
@@ -185,5 +197,101 @@ export async function getCityObjectIdByName(name: string): Promise<ObjectId | nu
   const city = await collection.findOne({ nameLower }, { projection: { _id: 1 } })
   if (!city?._id) return null
   return city._id
+}
+
+export async function setCityActive(id: string, isActive: boolean): Promise<City> {
+  if (!ObjectId.isValid(id)) {
+    throw new Error("Invalid city id")
+  }
+
+  if (shouldUseMongo()) {
+    const collection = await getCollection()
+    const now = new Date()
+
+    await collection.updateOne({ _id: new ObjectId(id) }, { $set: { isActive: Boolean(isActive), updatedAt: now } })
+    const updated = await collection.findOne({ _id: new ObjectId(id) })
+    if (!updated) {
+      throw new Error("City not found")
+    }
+    return mapMongoCity(updated)
+  }
+
+  const records = await readFileStore()
+  const idx = records.findIndex((item) => item.id === id)
+  if (idx < 0) {
+    throw new Error("City not found")
+  }
+
+  const now = new Date().toISOString()
+  const updated: FileCityRecord = { ...records[idx], isActive: Boolean(isActive), updatedAt: now }
+  records[idx] = updated
+  await writeFileStore(records)
+  return mapFileCity(updated)
+}
+
+export async function updateCity(id: string, name: string): Promise<City> {
+  const trimmed = name.trim()
+  if (!trimmed) {
+    throw new Error("City name is required")
+  }
+  if (!ObjectId.isValid(id)) {
+    throw new Error("Invalid city id")
+  }
+
+  const nameLower = normalizeNameLower(trimmed)
+
+  if (shouldUseMongo()) {
+    const collection = await getCollection()
+    const now = new Date()
+
+    // Check if new name conflicts
+    const existing = await collection.findOne({ nameLower, _id: { $ne: new ObjectId(id) } })
+    if (existing) {
+      throw new Error("City with this name already exists")
+    }
+
+    await collection.updateOne({ _id: new ObjectId(id) }, { $set: { name: trimmed, nameLower, updatedAt: now } })
+    const updated = await collection.findOne({ _id: new ObjectId(id) })
+    if (!updated) {
+      throw new Error("City not found")
+    }
+    return mapMongoCity(updated)
+  }
+
+  const records = await readFileStore()
+  const idx = records.findIndex((item) => item.id === id)
+  if (idx < 0) {
+    throw new Error("City not found")
+  }
+
+  const existing = records.find((item) => item.nameLower === nameLower && item.id !== id)
+  if (existing) {
+    throw new Error("City with this name already exists")
+  }
+
+  const now = new Date().toISOString()
+  const updated: FileCityRecord = { ...records[idx], name: trimmed, nameLower, updatedAt: now }
+  records[idx] = updated
+  await writeFileStore(records)
+  return mapFileCity(updated)
+}
+
+export async function deleteCity(id: string): Promise<void> {
+  if (!ObjectId.isValid(id)) {
+    throw new Error("Invalid city id")
+  }
+
+  if (shouldUseMongo()) {
+    const collection = await getCollection()
+    await collection.deleteOne({ _id: new ObjectId(id) })
+    return
+  }
+
+  const records = await readFileStore()
+  const newRecords = records.filter((item) => item.id !== id)
+  if (newRecords.length === records.length) {
+    throw new Error("City not found")
+  }
+  await writeFileStore(newRecords)
 }
 
