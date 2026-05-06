@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from "react"
 import Link from "next/link"
 import {
   RefreshCw,
-  Send,
   Search,
   Filter,
   User,
@@ -12,28 +11,18 @@ import {
   MapPin,
   Mail,
   Calendar,
-  CheckCircle2,
-  XCircle,
   Loader2,
   Megaphone,
-  Globe,
-  Info
+  Info,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
 import type { FilterState, FormSubmission } from "@/types"
 
 function formatDateTime(iso?: string | null) {
@@ -66,12 +55,6 @@ function isSentLike(status: string) {
   return ["sent", "accepted", "delivered", "read"].includes(status)
 }
 
-function shortMessageId(messageId?: string | null) {
-  if (!messageId) return ""
-  if (messageId.length <= 22) return messageId
-  return `${messageId.slice(0, 10)}...${messageId.slice(-8)}`
-}
-
 function statusBadge(status: string) {
   switch (status) {
     case "sent":
@@ -97,12 +80,9 @@ function statusBadge(status: string) {
 export default function Dashboard() {
   const [submissions, setSubmissions] = useState<FormSubmission[]>([])
   const [filteredSubmissions, setFilteredSubmissions] = useState<FormSubmission[]>([])
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(false)
-  const [messageDialogOpen, setMessageDialogOpen] = useState(false)
-  const [message, setMessage] = useState("")
-  const [sending, setSending] = useState(false)
-  const [sendResults, setSendResults] = useState<Array<{ phone: string; success: boolean; message: string }>>([])
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 10
 
   const [filters, setFilters] = useState<FilterState>({
     city: "all",
@@ -205,66 +185,14 @@ export default function Dashboard() {
     }
 
     setFilteredSubmissions(result)
+    setCurrentPage(1) // Reset to page 1 when filters change
   }, [submissions, filters])
 
-  const toggleSelect = (id: string) => {
-    const newSelected = new Set(selectedIds)
-    if (newSelected.has(id)) {
-      newSelected.delete(id)
-    } else {
-      newSelected.add(id)
-    }
-    setSelectedIds(newSelected)
-  }
-
-  const toggleSelectAll = () => {
-    if (selectedIds.size === filteredSubmissions.length) {
-      setSelectedIds(new Set())
-    } else {
-      setSelectedIds(new Set(filteredSubmissions.map((submission) => submission.id)))
-    }
-  }
-
-  const sendMessages = async () => {
-    if (!message.trim()) return
-
-    setSending(true)
-    setSendResults([])
-
-    const selected = filteredSubmissions.filter((submission) => selectedIds.has(submission.id))
-    const results: Array<{ phone: string; success: boolean; message: string }> = []
-
-    for (const submission of selected) {
-      try {
-        const response = await fetch("/api/whatsapp", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            phone: submission.phone,
-            message: message.replace("{name}", submission.name || "there"),
-          }),
-        })
-        const result = await response.json()
-        results.push({
-          phone: submission.phone,
-          success: result.success,
-          message: result.success ? "Sent" : result.message,
-        })
-      } catch {
-        results.push({
-          phone: submission.phone,
-          success: false,
-          message: "Failed",
-        })
-      }
-    }
-
-    setSendResults(results)
-    setSending(false)
-    await loadSubmissions()
-  }
-
-  const selectedCount = selectedIds.size
+  const totalPages = Math.ceil(filteredSubmissions.length / itemsPerPage)
+  const paginatedSubmissions = filteredSubmissions.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  )
 
   return (
     <div className="min-h-screen bg-muted/30">
@@ -284,10 +212,6 @@ export default function Dashboard() {
             </Button>
             <Button variant="outline" size="sm" onClick={syncWordPress} disabled={loading}>
               Sync WordPress
-            </Button>
-            <Button size="sm" onClick={() => setMessageDialogOpen(true)} disabled={selectedCount === 0} className="shadow-sm">
-              <Send className="h-4 w-4" />
-              Send Message ({selectedCount})
             </Button>
           </div>
         </div>
@@ -429,16 +353,11 @@ export default function Dashboard() {
           </Card>
         ) : (
           <Card className="overflow-hidden shadow-sm border-border/60">
-            <Table>
-              <TableHeader className="bg-muted/50">
-                <TableRow className="hover:bg-transparent">
-                  <TableHead className="w-[50px]">
-                    <Checkbox
-                      checked={selectedIds.size === filteredSubmissions.length && filteredSubmissions.length > 0}
-                      onCheckedChange={toggleSelectAll}
-                    />
-                  </TableHead>
-                  <TableHead>Name</TableHead>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader className="bg-muted/50">
+                  <TableRow className="hover:bg-transparent">
+                    <TableHead>Name</TableHead>
                   <TableHead>Phone</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>City</TableHead>
@@ -450,23 +369,17 @@ export default function Dashboard() {
                   <TableHead>Reminder</TableHead>
                 </TableRow>
               </TableHeader>
-              <TableBody>
-                {filteredSubmissions.map((submission) => {
-                  const welcomeStatus = getDeliveryStatus(submission, "welcome")
-                  const reminderStatus = getDeliveryStatus(submission, "reminder")
+                <TableBody>
+                  {paginatedSubmissions.map((submission) => {
+                    const welcomeStatus = getDeliveryStatus(submission, "welcome")
+                    const reminderStatus = getDeliveryStatus(submission, "reminder")
 
-                  return (
-                    <TableRow 
-                      key={submission.id} 
-                      className={`hover:bg-muted/30 transition-colors ${selectedIds.has(submission.id) ? "bg-primary/5" : ""}`}
-                    >
-                      <TableCell>
-                        <Checkbox
-                          checked={selectedIds.has(submission.id)}
-                          onCheckedChange={() => toggleSelect(submission.id)}
-                        />
-                      </TableCell>
-                      <TableCell className="font-medium">
+                    return (
+                      <TableRow 
+                        key={submission.id} 
+                        className="hover:bg-muted/30 transition-colors"
+                      >
+                        <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
                           <User className="h-4 w-4 text-gray-400" />
                           {submission.name}
@@ -523,106 +436,63 @@ export default function Dashboard() {
                           {formatDateTime(submission.eventAt)}
                         </div>
                       </TableCell>
-                      <TableCell>
-                        <div className="space-y-1">
-                          {statusBadge(welcomeStatus)}
-                          {submission.welcomeMessageId && (
-                            <p className="text-[11px] text-gray-500">ID: {shortMessageId(submission.welcomeMessageId)}</p>
-                          )}
-                          {submission.welcomeDeliveryError && (
-                            <p className="text-[11px] text-red-600">{submission.welcomeDeliveryError}</p>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="space-y-1">
-                          {statusBadge(reminderStatus)}
-                          {submission.reminderMessageId && (
-                            <p className="text-[11px] text-gray-500">ID: {shortMessageId(submission.reminderMessageId)}</p>
-                          )}
-                          {submission.reminderDeliveryError && (
-                            <p className="text-[11px] text-red-600">{submission.reminderDeliveryError}</p>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  )
-                })}
-              </TableBody>
-            </Table>
+                        <TableCell>
+                          <div className="space-y-1">
+                            {statusBadge(welcomeStatus)}
+                            {submission.welcomeDeliveryError && (
+                              <p className="text-[11px] text-destructive">{submission.welcomeDeliveryError}</p>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-1">
+                            {statusBadge(reminderStatus)}
+                            {submission.reminderDeliveryError && (
+                              <p className="text-[11px] text-destructive">{submission.reminderDeliveryError}</p>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+            
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between px-4 py-3 border-t bg-muted/20">
+                <div className="text-sm text-muted-foreground">
+                  Showing <span className="font-medium">{(currentPage - 1) * itemsPerPage + 1}</span> to{" "}
+                  <span className="font-medium">
+                    {Math.min(currentPage * itemsPerPage, filteredSubmissions.length)}
+                  </span>{" "}
+                  of <span className="font-medium">{filteredSubmissions.length}</span> results
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4 mr-1" />
+                    Previous
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                  >
+                    Next
+                    <ChevronRight className="h-4 w-4 ml-1" />
+                  </Button>
+                </div>
+              </div>
+            )}
           </Card>
         )}
       </main>
-
-      <Dialog open={messageDialogOpen} onOpenChange={setMessageDialogOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle>Send WhatsApp Message</DialogTitle>
-            <DialogDescription>
-              Sending to {selectedCount} recipient{selectedCount !== 1 ? "s" : ""}. Use {"{name}"} to include the
-              recipient&apos;s name.
-            </DialogDescription>
-          </DialogHeader>
-
-          {sendResults.length > 0 ? (
-            <div className="py-4">
-              <h4 className="font-medium mb-3">Send Results</h4>
-              <div className="max-h-[200px] overflow-y-auto space-y-2">
-                {sendResults.map((result, index) => (
-                  <div key={index} className="flex items-center gap-2 text-sm">
-                    {result.success ? (
-                      <CheckCircle2 className="h-4 w-4 text-green-500" />
-                    ) : (
-                      <XCircle className="h-4 w-4 text-red-500" />
-                    )}
-                    <span>{result.phone}</span>
-                    <span className="text-gray-500">- {result.message}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div className="py-4">
-              <textarea
-                value={message}
-                onChange={(event) => setMessage(event.target.value)}
-                placeholder="Enter your message here... Use {name} for recipient's name"
-                className="w-full h-[150px] p-3 border rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-ring"
-              />
-              <p className="text-xs text-gray-500 mt-2">
-                Preview: {message.replace("{name}", "John") || "Your message will appear here..."}
-              </p>
-            </div>
-          )}
-
-          <DialogFooter>
-            {sendResults.length > 0 ? (
-              <Button
-                onClick={() => {
-                  setSendResults([])
-                  setMessage("")
-                }}
-              >
-                Send Another Message
-              </Button>
-            ) : (
-              <Button onClick={sendMessages} disabled={sending || !message.trim()}>
-                {sending ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    Sending...
-                  </>
-                ) : (
-                  <>
-                    <Send className="h-4 w-4 mr-2" />
-                    Send to {selectedCount} Recipient{selectedCount !== 1 ? "s" : ""}
-                  </>
-                )}
-              </Button>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
