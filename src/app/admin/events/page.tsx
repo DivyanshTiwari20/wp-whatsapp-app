@@ -33,6 +33,7 @@ export default function AdminEventsPage() {
   const [createEventOpen, setCreateEventOpen] = useState(false)
   const [newEventName, setNewEventName] = useState("")
   const [newEventCityId, setNewEventCityId] = useState<string>("")
+  const [newEventDate, setNewEventDate] = useState("")
 
   const [editingCity, setEditingCity] = useState<City | null>(null)
   const [editCityName, setEditCityName] = useState("")
@@ -40,6 +41,7 @@ export default function AdminEventsPage() {
 
   const [editingEvent, setEditingEvent] = useState<Event | null>(null)
   const [editEventName, setEditEventName] = useState("")
+  const [editEventDate, setEditEventDate] = useState("")
   const [deletingEvent, setDeletingEvent] = useState<Event | null>(null)
 
   const activeCount = useMemo(() => events.filter((e) => e.isActive).length, [events])
@@ -128,7 +130,7 @@ export default function AdminEventsPage() {
       const res = await fetch("/api/event", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, cityId: newEventCityId }),
+        body: JSON.stringify({ name, cityId: newEventCityId, eventDate: newEventDate || undefined }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data?.error || "Failed to create event")
@@ -143,6 +145,7 @@ export default function AdminEventsPage() {
       setCreateEventOpen(false)
       setNewEventName("")
       setNewEventCityId("")
+      setNewEventDate("")
 
       // Refresh in the background (non-blocking)
       loadAll()
@@ -233,15 +236,20 @@ export default function AdminEventsPage() {
     setSaving(true)
     setError("")
     try {
+      const payload: { name: string; eventDate?: string } = { name: editEventName.trim() }
+      if (editEventDate) {
+        payload.eventDate = editEventDate
+      }
+      
       const res = await fetch(`/api/event/${editingEvent.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: editEventName.trim() }),
+        body: JSON.stringify(payload),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data?.error || "Failed to update event")
 
-      setEvents((prev) => prev.map((e) => (e.id === editingEvent.id ? { ...e, name: editEventName.trim() } : e)))
+      setEvents((prev) => prev.map((e) => (e.id === editingEvent.id ? { ...e, name: editEventName.trim(), eventDate: editEventDate || undefined } : e)))
       setEditingEvent(null)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to update event")
@@ -447,6 +455,7 @@ export default function AdminEventsPage() {
                                 <div className="text-sm font-medium text-gray-900">{event.name}</div>
                                 <div className="text-xs text-gray-500">
                                   {event.isActive ? "Active (shown on WP form)" : "Inactive (hidden from WP form)"}
+                                  {event.eventDate && ` • ${new Date(event.eventDate).toLocaleString()}`}
                                 </div>
                               </div>
                             </div>
@@ -462,6 +471,7 @@ export default function AdminEventsPage() {
                                 className="h-8 w-8"
                                 onClick={() => {
                                   setEditEventName(event.name)
+                                  setEditEventDate(event.eventDate || "")
                                   setEditingEvent(event)
                                 }}
                               >
@@ -525,6 +535,15 @@ export default function AdminEventsPage() {
                 value={newEventName}
                 onChange={(e) => setNewEventName(e.target.value)}
                 placeholder="e.g. Jashn-e-Adab 2026"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">Event Date & Time (optional)</label>
+              <Input
+                type="datetime-local"
+                value={newEventDate}
+                onChange={(e) => setNewEventDate(e.target.value)}
               />
             </div>
 
@@ -606,16 +625,27 @@ export default function AdminEventsPage() {
             <DialogDescription>Update the name of the event.</DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">Event name</label>
-            <Input value={editEventName} onChange={(e) => setEditEventName(e.target.value)} />
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">Event name</label>
+              <Input value={editEventName} onChange={(e) => setEditEventName(e.target.value)} />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700">Event Date & Time (optional)</label>
+              <Input
+                type="datetime-local"
+                value={editEventDate}
+                onChange={(e) => setEditEventDate(e.target.value)}
+              />
+            </div>
           </div>
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditingEvent(null)}>
               Cancel
             </Button>
-            <Button onClick={updateEvent} disabled={saving || !editEventName.trim() || editEventName === editingEvent?.name}>
+            <Button onClick={updateEvent} disabled={saving || !editEventName.trim() || (editEventName === editingEvent?.name && editEventDate === (editingEvent?.eventDate || ""))}>
               Save
             </Button>
           </DialogFooter>

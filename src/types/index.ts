@@ -85,6 +85,7 @@ export interface Event {
   name: string
   cityId: string
   isActive: boolean
+  eventDate?: string
 }
 
 export interface SendMessageRequest {

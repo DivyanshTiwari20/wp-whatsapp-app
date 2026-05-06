@@ -78,6 +78,11 @@ export async function POST(request: NextRequest) {
           { status: 400 },
         )
       }
+      
+      // If the backend event has an explicit eventDate, override the one from the payload
+      if (validation.event && validation.event.eventDate) {
+        normalized.eventAt = new Date(validation.event.eventDate)
+      }
     }
 
     const { submission } = await upsertSubmission(normalized, payload)

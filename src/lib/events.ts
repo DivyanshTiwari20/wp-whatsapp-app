@@ -11,6 +11,7 @@ interface EventDocument {
   nameLower: string
   cityId: ObjectId
   isActive: boolean
+  eventDate?: string
   createdAt: Date
   updatedAt: Date
 }
@@ -21,6 +22,7 @@ interface FileEventRecord {
   nameLower: string
   cityId: string
   isActive: boolean
+  eventDate?: string
   createdAt: string
   updatedAt: string
 }
@@ -90,6 +92,7 @@ function mapMongoEvent(doc: EventDocument): Event {
     name: doc.name,
     cityId: doc.cityId.toString(),
     isActive: doc.isActive,
+    eventDate: doc.eventDate,
   }
 }
 
@@ -99,6 +102,7 @@ function mapFileEvent(doc: FileEventRecord): Event {
     name: doc.name,
     cityId: doc.cityId,
     isActive: doc.isActive,
+    eventDate: doc.eventDate,
   }
 }
 
@@ -138,7 +142,7 @@ export async function listActiveEventsByCityName(cityName: string): Promise<Even
   return listEvents({ cityId: city.id, onlyActive: true })
 }
 
-export async function createEvent(input: { name: string; cityId: string }): Promise<Event> {
+export async function createEvent(input: { name: string; cityId: string; eventDate?: string }): Promise<Event> {
   const trimmed = input.name.trim()
   if (!trimmed) {
     throw new Error("Event name is required")
@@ -164,6 +168,7 @@ export async function createEvent(input: { name: string; cityId: string }): Prom
       nameLower,
       cityId: cityIdObj,
       isActive: true,
+      eventDate: input.eventDate,
       createdAt: now,
       updatedAt: now,
     })
@@ -189,6 +194,7 @@ export async function createEvent(input: { name: string; cityId: string }): Prom
     nameLower,
     cityId: input.cityId,
     isActive: true,
+    eventDate: input.eventDate,
     createdAt: now,
     updatedAt: now,
   }
@@ -252,26 +258,26 @@ export async function validateEventSelection(input: { cityName: string; eventNam
     const event = items[0]
     if (!event) return { ok: false as const, reason: "event_not_found" as const }
     if (!event.isActive) return { ok: false as const, reason: "inactive" as const }
-    return { ok: true as const }
+    return { ok: true as const, event: mapMongoEvent(event) }
   }
 
   const records = await readFileStore()
   const event = records.find((item) => item.cityId === city.id && item.nameLower === eventNameLower)
   if (!event) return { ok: false as const, reason: "event_not_found" as const }
   if (!event.isActive) return { ok: false as const, reason: "inactive" as const }
-  return { ok: true as const }
+  return { ok: true as const, event: mapFileEvent(event) }
 }
 
-export async function updateEvent(id: string, name: string): Promise<Event> {
-  const trimmed = name.trim()
-  if (!trimmed) {
+export async function updateEvent(id: string, input: { name?: string; eventDate?: string }): Promise<Event> {
+  const trimmed = input.name ? input.name.trim() : undefined
+  if (trimmed === "") {
     throw new Error("Event name is required")
   }
   if (!ObjectId.isValid(id)) {
     throw new Error("Invalid event id")
   }
 
-  const nameLower = normalizeNameLower(trimmed)
+  const nameLower = trimmed ? normalizeNameLower(trimmed) : undefined
 
   if (shouldUseMongo()) {
     const collection = await getCollection()
@@ -283,11 +289,16 @@ export async function updateEvent(id: string, name: string): Promise<Event> {
     }
 
     const existing = await collection.findOne({ cityId: currentEvent.cityId, nameLower, _id: { $ne: new ObjectId(id) } })
-    if (existing) {
+    if (nameLower && existing) {
       throw new Error("Event with this name already exists in this city")
     }
 
-    await collection.updateOne({ _id: new ObjectId(id) }, { $set: { name: trimmed, nameLower, updatedAt: now } })
+    const updates: Partial<EventDocument> = { updatedAt: now }
+    if (trimmed) updates.name = trimmed
+    if (nameLower) updates.nameLower = nameLower
+    if (input.eventDate !== undefined) updates.eventDate = input.eventDate
+
+    await collection.updateOne({ _id: new ObjectId(id) }, { $set: updates })
     const updated = await collection.findOne({ _id: new ObjectId(id) })
     if (!updated) {
       throw new Error("Event not found after update")
@@ -302,13 +313,19 @@ export async function updateEvent(id: string, name: string): Promise<Event> {
   }
   
   const currentEvent = records[idx]
-  const existing = records.find((item) => item.cityId === currentEvent.cityId && item.nameLower === nameLower && item.id !== id)
+  const existing = nameLower ? records.find((item) => item.cityId === currentEvent.cityId && item.nameLower === nameLower && item.id !== id) : undefined
   if (existing) {
     throw new Error("Event with this name already exists in this city")
   }
 
   const now = new Date().toISOString()
-  const updated: FileEventRecord = { ...currentEvent, name: trimmed, nameLower, updatedAt: now }
+  const updated: FileEventRecord = { 
+    ...currentEvent, 
+    updatedAt: now,
+    ...(trimmed ? { name: trimmed } : {}),
+    ...(nameLower ? { nameLower } : {}),
+    ...(input.eventDate !== undefined ? { eventDate: input.eventDate } : {})
+  }
   records[idx] = updated
   await writeFileStore(records)
   return mapFileEvent(updated)

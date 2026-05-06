@@ -4,13 +4,16 @@ import { setEventActive, updateEvent, deleteEvent } from "@/lib/events"
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
-    const body = (await request.json().catch(() => ({}))) as { isActive?: boolean; name?: string }
+    const body = (await request.json().catch(() => ({}))) as { isActive?: boolean; name?: string; eventDate?: string }
     
     let updated;
     if (typeof body.isActive === "boolean") {
       updated = await setEventActive(id, body.isActive)
-    } else if (typeof body.name === "string") {
-      updated = await updateEvent(id, body.name)
+    } else if (typeof body.name === "string" || typeof body.eventDate === "string") {
+      updated = await updateEvent(id, { 
+        ...(typeof body.name === "string" ? { name: body.name } : {}),
+        ...(typeof body.eventDate === "string" ? { eventDate: body.eventDate } : {})
+      })
     } else {
       throw new Error("Invalid update payload")
     }
