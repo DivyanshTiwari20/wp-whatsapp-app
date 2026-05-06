@@ -15,6 +15,9 @@ import {
   CheckCircle2,
   XCircle,
   Loader2,
+  Megaphone,
+  Globe,
+  Info
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -264,25 +267,25 @@ export default function Dashboard() {
   const selectedCount = selectedIds.size
 
   return (
-    <div className="min-h-screen bg-white">
-      <header className="border-b bg-white sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+    <div className="min-h-screen bg-muted/30">
+      <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-10 shadow-sm">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h1 className="text-xl font-semibold text-gray-900">WhatsApp Contact Manager</h1>
-            <p className="text-sm text-gray-500">WordPress Form Submissions</p>
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">WhatsApp Contact Manager</h1>
+            <p className="text-sm text-muted-foreground mt-1">WordPress Form Submissions</p>
           </div>
-          <div className="flex items-center gap-3">
-            <Button variant="outline" size="sm" onClick={loadSubmissions} disabled={loading}>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="secondary" size="sm" onClick={loadSubmissions} disabled={loading}>
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
               Refresh
             </Button>
-            <Button asChild variant="outline" size="sm">
+            <Button asChild variant="outline" size="sm" className="hidden sm:inline-flex">
               <Link href="/admin/events">Manage Events</Link>
             </Button>
             <Button variant="outline" size="sm" onClick={syncWordPress} disabled={loading}>
               Sync WordPress
             </Button>
-            <Button size="sm" onClick={() => setMessageDialogOpen(true)} disabled={selectedCount === 0}>
+            <Button size="sm" onClick={() => setMessageDialogOpen(true)} disabled={selectedCount === 0} className="shadow-sm">
               <Send className="h-4 w-4" />
               Send Message ({selectedCount})
             </Button>
@@ -290,12 +293,15 @@ export default function Dashboard() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-6 py-6">
-        <Card className="mb-6">
-          <CardHeader className="pb-4">
-            <CardTitle className="text-base font-medium">Filters</CardTitle>
+      <main className="max-w-7xl mx-auto px-6 py-8">
+        <Card className="mb-6 border-border/60 shadow-sm bg-card overflow-hidden">
+          <CardHeader className="pb-4 bg-muted/20 border-b">
+            <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <Filter className="h-4 w-4" />
+              Filters
+            </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-6">
             <div className="flex flex-wrap gap-4">
               <div className="relative flex-1 min-w-[200px]">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -402,8 +408,7 @@ export default function Dashboard() {
                 className="w-[170px]"
               />
 
-              <div className="flex items-center text-sm text-gray-500">
-                <Filter className="h-4 w-4 mr-2" />
+              <div className="flex items-center justify-center bg-primary/10 text-primary px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap ml-auto">
                 {filteredSubmissions.length} results
               </div>
             </div>
@@ -411,19 +416,22 @@ export default function Dashboard() {
         </Card>
 
         {filteredSubmissions.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <User className="h-12 w-12 mx-auto text-gray-300 mb-4" />
-              <p className="text-gray-500">
-                {loading ? "Loading..." : "No submissions found. Click 'Sync WordPress' to import entries."}
+          <Card className="border-dashed border-2">
+            <CardContent className="py-16 text-center flex flex-col items-center justify-center">
+              <div className="bg-muted p-4 rounded-full mb-4">
+                <User className="h-8 w-8 text-muted-foreground" />
+              </div>
+              <h3 className="text-lg font-semibold text-foreground mb-1">No submissions found</h3>
+              <p className="text-muted-foreground text-sm max-w-sm">
+                {loading ? "Loading data..." : "Click 'Sync WordPress' to import entries or adjust your filters."}
               </p>
             </CardContent>
           </Card>
         ) : (
-          <Card>
+          <Card className="overflow-hidden shadow-sm border-border/60">
             <Table>
-              <TableHeader>
-                <TableRow className="bg-gray-50">
+              <TableHeader className="bg-muted/50">
+                <TableRow className="hover:bg-transparent">
                   <TableHead className="w-[50px]">
                     <Checkbox
                       checked={selectedIds.size === filteredSubmissions.length && filteredSubmissions.length > 0}
@@ -434,6 +442,8 @@ export default function Dashboard() {
                   <TableHead>Phone</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>City</TableHead>
+                  <TableHead>Event</TableHead>
+                  <TableHead>Source</TableHead>
                   <TableHead>Gender</TableHead>
                   <TableHead>Event Date</TableHead>
                   <TableHead>Welcome</TableHead>
@@ -446,7 +456,10 @@ export default function Dashboard() {
                   const reminderStatus = getDeliveryStatus(submission, "reminder")
 
                   return (
-                    <TableRow key={submission.id} className={selectedIds.has(submission.id) ? "bg-blue-50" : ""}>
+                    <TableRow 
+                      key={submission.id} 
+                      className={`hover:bg-muted/30 transition-colors ${selectedIds.has(submission.id) ? "bg-primary/5" : ""}`}
+                    >
                       <TableCell>
                         <Checkbox
                           checked={selectedIds.has(submission.id)}
@@ -475,22 +488,38 @@ export default function Dashboard() {
                       </TableCell>
                       <TableCell>
                         {submission.city && (
-                          <Badge variant="secondary">
+                          <Badge variant="secondary" className="font-normal text-xs bg-gray-100 text-gray-700 hover:bg-gray-200 border-0">
                             <MapPin className="h-3 w-3 mr-1" />
                             {submission.city}
                           </Badge>
                         )}
                       </TableCell>
                       <TableCell>
+                        {submission.event && (
+                          <div className="flex items-center gap-2 text-sm text-gray-700">
+                            <Megaphone className="h-4 w-4 text-gray-400" />
+                            <span className="truncate max-w-[150px]" title={submission.event}>{submission.event}</span>
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {submission.infoSource && (
+                          <Badge variant="outline" className="font-normal text-xs border-gray-200">
+                            <Info className="h-3 w-3 mr-1 text-gray-400" />
+                            {submission.infoSource}
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
                         {submission.gender && (
-                          <Badge variant={submission.gender.toLowerCase() === "male" ? "default" : "outline"}>
+                          <Badge variant={submission.gender.toLowerCase() === "male" ? "secondary" : "outline"} className="font-normal text-xs">
                             {submission.gender}
                           </Badge>
                         )}
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-2 text-sm text-gray-700">
-                          <Calendar className="h-4 w-4 text-gray-400" />
+                        <div className="flex items-center gap-2 text-sm text-foreground">
+                          <Calendar className="h-4 w-4 text-muted-foreground" />
                           {formatDateTime(submission.eventAt)}
                         </div>
                       </TableCell>

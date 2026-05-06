@@ -279,32 +279,32 @@ export default function AdminEventsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="border-b bg-white sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+    <div className="min-h-screen bg-muted/40">
+      <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-10">
+        <div className="max-w-6xl mx-auto px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1">
             <div className="flex items-center gap-3">
-              <Button asChild variant="outline" size="sm">
+              <Button asChild variant="ghost" size="sm" className="hidden md:flex">
                 <Link href="/">
-                  <ArrowLeft className="h-4 w-4" />
+                  <ArrowLeft className="h-4 w-4 mr-2" />
                   Dashboard
                 </Link>
               </Button>
-              <h1 className="text-xl font-semibold text-gray-900">Cities & Events</h1>
+              <h1 className="text-2xl font-bold tracking-tight text-foreground">Cities & Events</h1>
               {initialLoading || saving ? <Loader2 className="h-4 w-4 animate-spin text-gray-500" /> : null}
             </div>
-            <p className="text-sm text-gray-500">
-              These control what the WordPress form shows. Only <span className="font-medium">Active</span> events appear
+            <p className="text-sm text-muted-foreground">
+              These control what the WordPress form shows. Only <Badge variant="outline" className="mx-1">Active</Badge> events appear
               to users.
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => setCreateCityOpen(true)}>
-              <Plus className="h-4 w-4" />
+            <Button variant="outline" onClick={() => setCreateCityOpen(true)} className="w-full md:w-auto">
+              <Plus className="h-4 w-4 mr-2" />
               New City
             </Button>
-            <Button onClick={() => setCreateEventOpen(true)} disabled={cities.length === 0}>
-              <Plus className="h-4 w-4" />
+            <Button onClick={() => setCreateEventOpen(true)} disabled={cities.length === 0} className="w-full md:w-auto">
+              <Plus className="h-4 w-4 mr-2" />
               New Event
             </Button>
           </div>
@@ -316,32 +316,32 @@ export default function AdminEventsPage() {
           <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
         ) : null}
 
-        <div className="grid md:grid-cols-3 gap-4">
-          <Card>
+        <div className="grid md:grid-cols-3 gap-6">
+          <Card className="bg-card hover:shadow-md transition-shadow">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">Cities</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">Cities Managed</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-semibold text-gray-900">{cities.length}</div>
-              <p className="text-xs text-gray-500 mt-1">Used for filtering events in the WordPress form.</p>
+              <div className="text-3xl font-bold text-foreground">{cities.length}</div>
+              <p className="text-xs text-muted-foreground mt-1">Used for filtering events.</p>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="bg-card hover:shadow-md transition-shadow">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">Active events</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">Active Events</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-semibold text-gray-900">{activeCount}</div>
-              <p className="text-xs text-gray-500 mt-1">Visible to users on the WordPress form.</p>
+              <div className="text-3xl font-bold text-emerald-600">{activeCount}</div>
+              <p className="text-xs text-muted-foreground mt-1">Visible on WordPress forms.</p>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="bg-card hover:shadow-md transition-shadow">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-gray-600">Inactive events</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">Inactive Events</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-semibold text-gray-900">{inactiveCount}</div>
-              <p className="text-xs text-gray-500 mt-1">Hidden from users, but kept for later.</p>
+              <div className="text-3xl font-bold text-muted-foreground">{inactiveCount}</div>
+              <p className="text-xs text-muted-foreground mt-1">Hidden from users, saved for later.</p>
             </CardContent>
           </Card>
         </div>
@@ -365,22 +365,27 @@ export default function AdminEventsPage() {
             ) : (
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {cities.map((city) => (
-                  <div key={city.id} className="flex items-center justify-between border rounded-md px-3 py-2 bg-gray-50">
-                    <div className="flex items-center gap-2">
-                      <Building2 className="h-4 w-4 text-gray-400" />
+                  <Card key={city.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-border/50 hover:border-border hover:shadow-sm transition-all overflow-hidden p-0 bg-background">
+                    <div className="flex items-center gap-4 px-4 py-3">
+                      <div className="bg-primary/10 p-2.5 rounded-full">
+                        <Building2 className="h-4 w-4 text-primary" />
+                      </div>
                       <div className="leading-tight">
-                        <div className="text-sm font-medium text-gray-900">{city.name}</div>
-                        <div className="text-xs text-gray-500">
-                          {city.isActive !== false ? "Active" : "Inactive"}
+                        <div className="text-sm font-semibold text-foreground">{city.name}</div>
+                        <div className="text-xs text-muted-foreground mt-0.5">
+                          {city.isActive !== false ? <span className="text-emerald-600 font-medium">Active</span> : "Inactive"}
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Checkbox
-                        checked={city.isActive !== false}
-                        onCheckedChange={(v) => toggleCity(city, Boolean(v))}
-                        title="Toggle Active Status"
-                      />
+                    <div className="flex items-center gap-1 px-4 py-2 sm:py-3 bg-muted/30 w-full sm:w-auto border-t sm:border-t-0 sm:border-l sm:h-full justify-end">
+                      <div className="flex items-center gap-2 mr-2">
+                        <span className="text-xs text-muted-foreground">Active</span>
+                        <Checkbox
+                          checked={city.isActive !== false}
+                          onCheckedChange={(v) => toggleCity(city, Boolean(v))}
+                          title="Toggle Active Status"
+                        />
+                      </div>
                       <Button
                         variant="ghost"
                         size="icon"
@@ -395,13 +400,13 @@ export default function AdminEventsPage() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                        className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
                         onClick={() => setDeletingCity(city)}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
-                  </div>
+                  </Card>
                 ))}
               </div>
             )}
@@ -419,48 +424,52 @@ export default function AdminEventsPage() {
               cities.map((city) => {
                 const list = eventsByCity.get(city.id) || []
                 return (
-                  <div key={city.id} className="border rounded-lg p-4 bg-white">
-                    <div className="flex items-center justify-between gap-3 mb-3">
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline">{city.name}</Badge>
-                        <span className="text-sm text-gray-500">
-                          {list.length} total • {list.filter((e) => e.isActive).length} active
+                  <Card key={city.id} className="overflow-hidden border-border/50 bg-background shadow-sm">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 bg-muted/20 border-b">
+                      <div className="flex items-center gap-3">
+                        <Badge variant="secondary" className="px-3 py-1 font-semibold">{city.name}</Badge>
+                        <span className="text-sm text-muted-foreground">
+                          {list.length} total <span className="mx-1">•</span> <span className="text-emerald-600 font-medium">{list.filter((e) => e.isActive).length} active</span>
                         </span>
                       </div>
                       <Button
                         size="sm"
-                        variant="outline"
                         onClick={() => {
                           setNewEventCityId(city.id)
                           setCreateEventOpen(true)
                         }}
                       >
-                        <Plus className="h-4 w-4" />
+                        <Plus className="h-4 w-4 mr-2" />
                         Add Event
                       </Button>
                     </div>
+                    <div className="p-4">
 
                     {list.length === 0 ? (
-                      <p className="text-sm text-gray-500">No events yet.</p>
+                      <div className="text-center py-6">
+                        <p className="text-sm text-muted-foreground">No events in this city yet.</p>
+                      </div>
                     ) : (
-                      <div className="grid sm:grid-cols-2 gap-3">
+                      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         {list.map((event) => (
                           <div
                             key={event.id}
-                            className="flex items-center justify-between border rounded-md px-3 py-2 bg-gray-50"
+                            className="flex flex-col border border-border/60 rounded-lg bg-card hover:border-border hover:shadow-sm transition-all overflow-hidden"
                           >
-                            <div className="flex items-center gap-2">
-                              <CalendarDays className="h-4 w-4 text-gray-400" />
-                              <div className="leading-tight">
-                                <div className="text-sm font-medium text-gray-900">{event.name}</div>
-                                <div className="text-xs text-gray-500">
-                                  {event.isActive ? "Active (shown on WP form)" : "Inactive (hidden from WP form)"}
-                                  {event.eventDate && ` • ${new Date(event.eventDate).toLocaleString()}`}
+                            <div className="flex items-start gap-3 p-3">
+                              <div className="bg-primary/10 p-2 rounded-full mt-0.5">
+                                <CalendarDays className="h-4 w-4 text-primary" />
+                              </div>
+                              <div className="leading-tight flex-1">
+                                <div className="text-sm font-semibold text-foreground">{event.name}</div>
+                                <div className="text-xs text-muted-foreground mt-1 space-y-0.5">
+                                  <div>Status: {event.isActive ? <span className="text-emerald-600 font-medium">Active</span> : "Inactive"}</div>
+                                  {event.eventDate && <div className="text-foreground/70">🕒 {new Date(event.eventDate).toLocaleString()}</div>}
                                 </div>
                               </div>
                             </div>
 
-                            <div className="flex items-center gap-1">
+                            <div className="flex items-center justify-between gap-1 px-3 py-2 bg-muted/40 border-t mt-auto">
                               <div className="flex items-center gap-2 mr-2">
                                 <span className="text-xs text-gray-500">Active</span>
                                 <Checkbox checked={event.isActive} onCheckedChange={(v) => toggleEvent(event, Boolean(v))} />
@@ -480,7 +489,7 @@ export default function AdminEventsPage() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
                                 onClick={() => setDeletingEvent(event)}
                               >
                                 <Trash2 className="h-4 w-4" />
@@ -490,8 +499,8 @@ export default function AdminEventsPage() {
                         ))}
                       </div>
                     )}
-                  </div>
-                )
+                    </div>
+                  </Card>
               })
             )}
           </CardContent>
