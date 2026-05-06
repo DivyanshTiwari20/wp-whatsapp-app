@@ -501,6 +501,7 @@ export default function AdminEventsPage() {
                     )}
                     </div>
                   </Card>
+                )
               })
             )}
           </CardContent>
