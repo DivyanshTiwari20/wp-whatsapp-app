@@ -62,7 +62,27 @@ export default function AdminEventsPage() {
   }, [events])
 
   // Background data fetch — never blocks create operations
-  async function loadAll(isInitial = false) {
+  async function loadAll(isInitial = false, force = false) {
+    if (isInitial && !force && typeof window !== 'undefined') {
+      const cachedCities = sessionStorage.getItem('admin_cities_cache');
+      const cachedEvents = sessionStorage.getItem('admin_events_cache');
+      const cacheTime = sessionStorage.getItem('admin_events_time');
+      
+      if (cachedCities && cachedEvents && cacheTime) {
+        const age = Date.now() - parseInt(cacheTime, 10);
+        if (age < 5 * 60 * 1000) {
+          try {
+            setCities(JSON.parse(cachedCities));
+            setEvents(JSON.parse(cachedEvents));
+            if (isInitial) setInitialLoading(false);
+            return;
+          } catch (e) {
+            // Ignore parse errors
+          }
+        }
+      }
+    }
+
     if (isInitial) setInitialLoading(true)
     setFetchError("")
     try {
@@ -75,6 +95,12 @@ export default function AdminEventsPage() {
 
       setCities(Array.isArray(citiesData) ? citiesData : [])
       setEvents(Array.isArray(eventsData) ? eventsData : [])
+
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('admin_cities_cache', JSON.stringify(citiesData));
+        sessionStorage.setItem('admin_events_cache', JSON.stringify(eventsData));
+        sessionStorage.setItem('admin_events_time', Date.now().toString());
+      }
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Failed to load data"
       setFetchError(msg)
@@ -112,8 +138,8 @@ export default function AdminEventsPage() {
       setCreateCityOpen(false)
       setNewCityName("")
 
-      // Refresh in the background (non-blocking)
-      loadAll()
+      // Refresh in the background (non-blocking), forcing fetch
+      loadAll(false, true)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to create city")
     } finally {
@@ -147,8 +173,8 @@ export default function AdminEventsPage() {
       setNewEventCityId("")
       setNewEventDate("")
 
-      // Refresh in the background (non-blocking)
-      loadAll()
+      // Refresh in the background (non-blocking), forcing fetch
+      loadAll(false, true)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to create event")
     } finally {
@@ -298,8 +324,12 @@ export default function AdminEventsPage() {
               to users.
             </p>
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => setCreateCityOpen(true)} className="w-full md:w-auto">
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => loadAll(true, true)} disabled={initialLoading || saving}>
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Refresh
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setCreateCityOpen(true)} className="w-full md:w-auto">
               <Plus className="h-4 w-4 mr-2" />
               New City
             </Button>

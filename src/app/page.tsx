@@ -96,13 +96,37 @@ export default function Dashboard() {
   const cities = Array.from(new Set(submissions.map((submission) => submission.city).filter(Boolean)))
   const genders = Array.from(new Set(submissions.map((submission) => submission.gender).filter(Boolean)))
 
-  const loadSubmissions = useCallback(async () => {
+  const loadSubmissions = useCallback(async (force = false) => {
+    // If we have cached data and aren't forcing a refresh, use it instantly
+    if (!force && typeof window !== 'undefined') {
+      const cached = sessionStorage.getItem('dashboard_submissions_cache');
+      const cacheTime = sessionStorage.getItem('dashboard_submissions_time');
+      
+      if (cached && cacheTime) {
+        const age = Date.now() - parseInt(cacheTime, 10);
+        // Cache valid for 5 minutes
+        if (age < 5 * 60 * 1000) {
+          try {
+            const parsed = JSON.parse(cached);
+            setSubmissions(parsed);
+            return;
+          } catch (e) {
+            // Ignore parse errors, just fetch fresh
+          }
+        }
+      }
+    }
+
     setLoading(true)
     try {
       const response = await fetch("/api/submissions")
       const data = await response.json()
       if (Array.isArray(data)) {
         setSubmissions(data)
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('dashboard_submissions_cache', JSON.stringify(data));
+          sessionStorage.setItem('dashboard_submissions_time', Date.now().toString());
+        }
       }
     } catch (error) {
       console.error("Failed to load submissions:", error)
@@ -118,6 +142,10 @@ export default function Dashboard() {
       const data = await response.json()
       if (Array.isArray(data)) {
         setSubmissions(data)
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('dashboard_submissions_cache', JSON.stringify(data));
+          sessionStorage.setItem('dashboard_submissions_time', Date.now().toString());
+        }
       }
     } catch (error) {
       console.error("Failed to sync WordPress:", error)
@@ -203,7 +231,7 @@ export default function Dashboard() {
             <p className="text-sm text-muted-foreground mt-1">WordPress Form Submissions</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="secondary" size="sm" onClick={loadSubmissions} disabled={loading}>
+            <Button variant="secondary" size="sm" onClick={() => loadSubmissions(true)} disabled={loading}>
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
               Refresh
             </Button>
