@@ -144,6 +144,24 @@ export default function SendMessagePage() {
   }, [allLeads, query])
 
   async function loadAll(silent = false) {
+    if (!silent && typeof window !== 'undefined') {
+      const cachedContacts = sessionStorage.getItem('send_msg_contacts')
+      const cachedSubmissions = sessionStorage.getItem('send_msg_submissions')
+      const cachedMessages = sessionStorage.getItem('send_msg_messages')
+      const cacheTime = sessionStorage.getItem('send_msg_time')
+
+      if (cachedContacts && cachedSubmissions && cachedMessages && cacheTime) {
+        if (Date.now() - parseInt(cacheTime, 10) < 5 * 60 * 1000) {
+          try {
+            setContacts(JSON.parse(cachedContacts))
+            setSubmissions(JSON.parse(cachedSubmissions))
+            setMessages(JSON.parse(cachedMessages))
+            return
+          } catch (e) {}
+        }
+      }
+    }
+
     if (!silent) setLoading(true)
     try {
       const [contactsRes, submissionsRes, messagesRes] = await Promise.all([
@@ -157,6 +175,13 @@ export default function SendMessagePage() {
       if (Array.isArray(contactsData)) setContacts(contactsData)
       if (Array.isArray(submissionsData)) setSubmissions(submissionsData)
       if (Array.isArray(messagesData)) setMessages(messagesData)
+
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('send_msg_contacts', JSON.stringify(contactsData))
+        sessionStorage.setItem('send_msg_submissions', JSON.stringify(submissionsData))
+        sessionStorage.setItem('send_msg_messages', JSON.stringify(messagesData))
+        sessionStorage.setItem('send_msg_time', Date.now().toString())
+      }
     } catch (err) {
       console.error("Failed to load campaign page", err)
     } finally {

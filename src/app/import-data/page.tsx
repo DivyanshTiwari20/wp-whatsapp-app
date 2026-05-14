@@ -139,11 +139,31 @@ export default function ImportDataPage() {
   const [contactDialogOpen, setContactDialogOpen] = useState(false)
 
   async function loadContacts(silent = false) {
+    if (!silent && typeof window !== 'undefined') {
+      const cached = sessionStorage.getItem('import_contacts_cache')
+      const cacheTime = sessionStorage.getItem('import_contacts_time')
+      if (cached && cacheTime) {
+        const age = Date.now() - parseInt(cacheTime, 10)
+        if (age < 5 * 60 * 1000) {
+          try {
+            setContacts(JSON.parse(cached))
+            return
+          } catch (e) {}
+        }
+      }
+    }
+
     if (!silent) setLoading(true)
     try {
       const response = await fetch("/api/contacts")
       const data = await response.json()
-      if (Array.isArray(data)) setContacts(data)
+      if (Array.isArray(data)) {
+        setContacts(data)
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('import_contacts_cache', JSON.stringify(data))
+          sessionStorage.setItem('import_contacts_time', Date.now().toString())
+        }
+      }
     } catch (err) {
       console.error("Failed to load contacts", err)
     } finally {

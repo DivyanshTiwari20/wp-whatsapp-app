@@ -41,6 +41,23 @@ export default function ChatsPage() {
   }, [threads, query])
 
   const loadThreads = useCallback(async (silent = false) => {
+    if (!silent && typeof window !== 'undefined') {
+      const cached = sessionStorage.getItem('chats_threads_cache')
+      const cacheTime = sessionStorage.getItem('chats_threads_time')
+      if (cached && cacheTime) {
+        if (Date.now() - parseInt(cacheTime, 10) < 5 * 60 * 1000) {
+          try {
+            const parsed = JSON.parse(cached)
+            setThreads(parsed)
+            if (!activeThread && parsed.length > 0) {
+              setActiveThread(parsed[0])
+            }
+            return
+          } catch (e) {}
+        }
+      }
+    }
+
     if (!silent) setLoading(true)
     try {
       const response = await fetch("/api/chats")
@@ -49,6 +66,10 @@ export default function ChatsPage() {
         setThreads(data.threads)
         if (!activeThread && data.threads.length > 0) {
           setActiveThread(data.threads[0])
+        }
+        if (typeof window !== 'undefined') {
+          sessionStorage.setItem('chats_threads_cache', JSON.stringify(data.threads))
+          sessionStorage.setItem('chats_threads_time', Date.now().toString())
         }
       }
     } catch (err) {
