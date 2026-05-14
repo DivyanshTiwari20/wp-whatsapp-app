@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { saveChatMessage } from "@/lib/chats"
 import { getWelcomeMessage } from "@/lib/templates"
 import { markWelcomeStatus, upsertSubmission } from "@/lib/submissions"
 import { validateEventSelection } from "@/lib/events"
@@ -101,6 +102,17 @@ export async function POST(request: NextRequest) {
       await markWelcomeStatus(submission.id, result.success, result.success ? undefined : result.message, {
         messageId: result.messageId,
         deliveryStatus: result.deliveryStatus,
+      })
+      await saveChatMessage({
+        phone: submission.phone,
+        contactName: submission.name,
+        direction: "outbound",
+        type: "template",
+        text: message,
+        templateName: process.env.WHATSAPP_WELCOME_TEMPLATE_NAME || "welcome",
+        messageId: result.messageId || null,
+        deliveryStatus: result.deliveryStatus || (result.success ? "accepted" : "failed"),
+        error: result.success ? null : result.message,
       })
 
       return jsonWithCors(request, {

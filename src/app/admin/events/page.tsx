@@ -62,7 +62,7 @@ export default function AdminEventsPage() {
   }, [events])
 
   // Background data fetch — never blocks create operations
-  async function loadAll(isInitial = false, force = false) {
+  async function loadAll(isInitial = false, force = false, silent = false) {
     if (isInitial && !force && typeof window !== 'undefined') {
       const cachedCities = sessionStorage.getItem('admin_cities_cache');
       const cachedEvents = sessionStorage.getItem('admin_events_cache');
@@ -83,7 +83,7 @@ export default function AdminEventsPage() {
       }
     }
 
-    if (isInitial) setInitialLoading(true)
+    if (isInitial && !silent) setInitialLoading(true)
     setFetchError("")
     try {
       const [citiesRes, eventsRes] = await Promise.all([fetch("/api/cities"), fetch("/api/events")])
@@ -106,12 +106,19 @@ export default function AdminEventsPage() {
       setFetchError(msg)
       console.error("Background fetch failed:", msg)
     } finally {
-      if (isInitial) setInitialLoading(false)
+      if (isInitial && !silent) setInitialLoading(false)
     }
   }
 
   useEffect(() => {
     loadAll(true)
+
+    // Real-time auto refresh every 10 seconds
+    const intervalId = setInterval(() => {
+      loadAll(false, true, true)
+    }, 10000)
+
+    return () => clearInterval(intervalId)
   }, [])
 
   async function createCity() {
@@ -306,25 +313,14 @@ export default function AdminEventsPage() {
 
   return (
     <div className="min-h-screen bg-muted/40">
-      <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <div className="flex items-center gap-3">
-              <Button asChild variant="ghost" size="sm" className="hidden md:flex">
-                <Link href="/">
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Dashboard
-                </Link>
-              </Button>
-              <h1 className="text-2xl font-bold tracking-tight text-foreground">Cities & Events</h1>
-              {initialLoading || saving ? <Loader2 className="h-4 w-4 animate-spin text-gray-500" /> : null}
-            </div>
-            <p className="text-sm text-muted-foreground">
-              These control what the WordPress form shows. Only <Badge variant="outline" className="mx-1">Active</Badge> events appear
-              to users.
-            </p>
+      <main className="max-w-6xl mx-auto px-6 py-6 space-y-6">
+        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-950">Manage Events</h1>
+            <p className="mt-1 text-sm text-slate-500">Add or edit cities and active events for the WordPress forms.</p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {initialLoading || saving ? <Loader2 className="h-4 w-4 animate-spin text-gray-500 md:mr-2" /> : null}
             <Button variant="outline" size="sm" onClick={() => loadAll(true, true)} disabled={initialLoading || saving}>
               <RefreshCw className="h-4 w-4 mr-2" />
               Refresh
@@ -339,9 +335,6 @@ export default function AdminEventsPage() {
             </Button>
           </div>
         </div>
-      </header>
-
-      <main className="max-w-6xl mx-auto px-6 py-6 space-y-6">
         {error ? (
           <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
         ) : null}
@@ -714,4 +707,3 @@ export default function AdminEventsPage() {
     </div>
   )
 }
-

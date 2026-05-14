@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { saveChatMessage } from "@/lib/chats"
 import { getReminderMessage } from "@/lib/templates"
 import { getPendingReminderSubmissions, markReminderStatus } from "@/lib/submissions"
 import { sendReminderWhatsApp } from "@/lib/whatsapp"
@@ -71,6 +72,17 @@ async function runReminderDispatch() {
       await markReminderStatus(submission.id, result.success, result.success ? undefined : result.message, {
         messageId: result.messageId,
         deliveryStatus: result.deliveryStatus,
+      })
+      await saveChatMessage({
+        phone: submission.phone,
+        contactName: submission.name,
+        direction: "outbound",
+        type: "template",
+        text: message,
+        templateName: process.env.WHATSAPP_REMINDER_TEMPLATE_NAME || "reminder",
+        messageId: result.messageId || null,
+        deliveryStatus: result.deliveryStatus || (result.success ? "accepted" : "failed"),
+        error: result.success ? null : result.message,
       })
 
       outcomes.push({

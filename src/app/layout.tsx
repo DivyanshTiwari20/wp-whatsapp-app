@@ -1,15 +1,10 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { AppShell } from "@/components/app-shell";
 import "./globals.css";
 
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-inter",
-});
-
 export const metadata: Metadata = {
-  title: "WhatsApp Contact Manager",
-  description: "Manage WordPress form submissions and send WhatsApp messages",
+  title: "Askus WhatsApp Manager",
+  description: "WhatsApp Manager",
 };
 
 export default function RootLayout({
@@ -19,8 +14,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${inter.variable} antialiased`}>
-        {children}
+      <body className="antialiased">
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   );

@@ -1,4 +1,5 @@
 import type { DeliveryStatus, SendMessageResponse } from "@/types"
+import { normalizePhoneNumber } from "@/lib/phone"
 
 interface SendOptions {
   templateName?: string
@@ -14,17 +15,6 @@ function buildBodyComponents(params: Array<string | undefined | null>) {
       parameters: texts.map((text) => ({ type: "text", text })),
     },
   ]
-}
-
-function normalizePhone(phone: string) {
-  const phoneNumber = phone.replace(/[^0-9]/g, "")
-  if (phoneNumber.length === 10) {
-    return `91${phoneNumber}`
-  }
-  if (phoneNumber.startsWith("0") && phoneNumber.length === 11) {
-    return `91${phoneNumber.substring(1)}`
-  }
-  return phoneNumber
 }
 
 function trimTrailingSlash(input: string) {
@@ -105,6 +95,19 @@ export async function sendReminderWhatsApp(
   })
 }
 
+export async function sendTemplateWhatsApp(
+  phone: string,
+  templateName: string,
+  fallbackMessage: string,
+  variables?: Array<string | undefined | null>,
+) {
+  return sendWhatsAppMessage(phone, fallbackMessage, {
+    templateName,
+    templateLanguage: process.env.WHATSAPP_TEMPLATE_LANGUAGE || "en",
+    components: variables && variables.length > 0 ? buildBodyComponents(variables) : undefined,
+  })
+}
+
 async function sendWhatsAppMessage(phone: string, message: string, options?: SendOptions): Promise<SendMessageResponse> {
   if (!phone || !message) {
     return {
@@ -115,7 +118,7 @@ async function sendWhatsAppMessage(phone: string, message: string, options?: Sen
     }
   }
 
-  const waPhone = normalizePhone(phone)
+  const waPhone = normalizePhoneNumber(phone)
   const whatsappToken = process.env.WHATSAPP_ACCESS_TOKEN
   const endpoint = getMessagesEndpoint()
 

@@ -18,6 +18,7 @@ interface SubmissionDocument {
   phone: string
   email?: string
   city?: string
+  currentCity?: string
   event?: string
   gender?: string
   eventAt: Date | null
@@ -48,6 +49,7 @@ interface FileSubmissionRecord {
   phone: string
   email?: string
   city?: string
+  currentCity?: string
   event?: string
   gender?: string
   eventAt: string | null
@@ -133,6 +135,7 @@ function mapMongoSubmission(doc: SubmissionDocument): FormSubmission {
     phone: doc.phone,
     email: doc.email,
     city: doc.city,
+    currentCity: doc.currentCity,
     event: doc.event,
     gender: doc.gender,
     eventAt: doc.eventAt ? doc.eventAt.toISOString() : null,
@@ -162,6 +165,7 @@ function normalizeFileRecord(input: Partial<FileSubmissionRecord> & Pick<FileSub
     phone: input.phone,
     email: input.email,
     city: input.city,
+    currentCity: input.currentCity,
     event: input.event,
     gender: input.gender,
     eventAt: input.eventAt || null,
@@ -194,6 +198,7 @@ function mapFileSubmission(item: FileSubmissionRecord): FormSubmission {
     phone: item.phone,
     email: item.email,
     city: item.city,
+    currentCity: item.currentCity,
     event: item.event,
     gender: item.gender,
     eventAt: item.eventAt,
@@ -269,6 +274,7 @@ export async function upsertSubmission(normalized: NormalizedSubmission, sourceP
             phone: normalized.phone,
             email: normalized.email,
             city: normalized.city,
+            currentCity: normalized.currentCity,
             event: normalized.event,
             gender: normalized.gender,
             eventAt: normalized.eventAt,
@@ -295,6 +301,7 @@ export async function upsertSubmission(normalized: NormalizedSubmission, sourceP
       phone: normalized.phone,
       email: normalized.email,
       city: normalized.city,
+      currentCity: normalized.currentCity,
       event: normalized.event,
       gender: normalized.gender,
       eventAt: normalized.eventAt,
@@ -344,6 +351,7 @@ export async function upsertSubmission(normalized: NormalizedSubmission, sourceP
       phone: normalized.phone,
       email: normalized.email,
       city: normalized.city,
+      currentCity: normalized.currentCity,
       event: normalized.event,
       gender: normalized.gender,
       eventAt: normalized.eventAt ? normalized.eventAt.toISOString() : null,
@@ -366,6 +374,7 @@ export async function upsertSubmission(normalized: NormalizedSubmission, sourceP
     phone: normalized.phone,
     email: normalized.email,
     city: normalized.city,
+    currentCity: normalized.currentCity,
     event: normalized.event,
     gender: normalized.gender,
     eventAt: normalized.eventAt ? normalized.eventAt.toISOString() : null,

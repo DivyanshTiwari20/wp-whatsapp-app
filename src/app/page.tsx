@@ -96,12 +96,12 @@ export default function Dashboard() {
   const cities = Array.from(new Set(submissions.map((submission) => submission.city).filter(Boolean)))
   const genders = Array.from(new Set(submissions.map((submission) => submission.gender).filter(Boolean)))
 
-  const loadSubmissions = useCallback(async (force = false) => {
+  const loadSubmissions = useCallback(async (force = false, silent = false) => {
     // If we have cached data and aren't forcing a refresh, use it instantly
     if (!force && typeof window !== 'undefined') {
       const cached = sessionStorage.getItem('dashboard_submissions_cache');
       const cacheTime = sessionStorage.getItem('dashboard_submissions_time');
-      
+
       if (cached && cacheTime) {
         const age = Date.now() - parseInt(cacheTime, 10);
         // Cache valid for 5 minutes
@@ -117,7 +117,7 @@ export default function Dashboard() {
       }
     }
 
-    setLoading(true)
+    if (!silent) setLoading(true)
     try {
       const response = await fetch("/api/submissions")
       const data = await response.json()
@@ -131,31 +131,19 @@ export default function Dashboard() {
     } catch (error) {
       console.error("Failed to load submissions:", error)
     } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  const syncWordPress = useCallback(async () => {
-    setLoading(true)
-    try {
-      const response = await fetch("/api/wordpress")
-      const data = await response.json()
-      if (Array.isArray(data)) {
-        setSubmissions(data)
-        if (typeof window !== 'undefined') {
-          sessionStorage.setItem('dashboard_submissions_cache', JSON.stringify(data));
-          sessionStorage.setItem('dashboard_submissions_time', Date.now().toString());
-        }
-      }
-    } catch (error) {
-      console.error("Failed to sync WordPress:", error)
-    } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }, [])
 
   useEffect(() => {
     loadSubmissions()
+
+    // Real-time auto refresh every 10 seconds
+    const intervalId = setInterval(() => {
+      loadSubmissions(true, true)
+    }, 10000)
+
+    return () => clearInterval(intervalId)
   }, [loadSubmissions])
 
   useEffect(() => {
@@ -224,8 +212,8 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-muted/30">
-      <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-10 shadow-sm">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {/* <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-10 shadow-sm">
+        <div className="max-w-[1500px] mx-auto px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-foreground">WhatsApp Contact Manager</h1>
             <p className="text-sm text-muted-foreground mt-1">WordPress Form Submissions</p>
@@ -238,24 +226,25 @@ export default function Dashboard() {
             <Button asChild variant="outline" size="sm" className="hidden sm:inline-flex">
               <Link href="/admin/events">Manage Events</Link>
             </Button>
-            <Button variant="outline" size="sm" onClick={syncWordPress} disabled={loading}>
-              Sync WordPress
-            </Button>
           </div>
         </div>
-      </header>
+      </header> */}
 
-      <main className="max-w-7xl mx-auto px-6 py-8">
+      <main className="max-w-[1500px] mx-auto px-6 py-8">
+        <div className="mb-6">
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-950">WordPress Data</h1>
+          <p className="mt-1 text-sm text-slate-500">Live submissions imported from the WordPress forms.</p>
+        </div>
         <Card className="mb-6 border-border/60 shadow-sm bg-card overflow-hidden">
-          <CardHeader className="pb-4 bg-muted/20 border-b">
+          {/* <CardHeader className="pb-4 bg-muted/20 border-b">
             <CardTitle className="text-base font-semibold flex items-center gap-2">
               <Filter className="h-4 w-4" />
               Filters
             </CardTitle>
-          </CardHeader>
+          </CardHeader> */}
           <CardContent className="pt-6">
-            <div className="flex flex-wrap gap-4">
-              <div className="relative flex-1 min-w-[200px]">
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(190px,260px)_minmax(130px,160px)_minmax(140px,170px)_minmax(180px,210px)_minmax(145px,165px)_minmax(145px,165px)_minmax(96px,120px)] lg:items-center xl:grid-cols-[minmax(210px,300px)_minmax(145px,170px)_minmax(145px,170px)_minmax(190px,230px)_minmax(150px,170px)_minmax(150px,170px)_minmax(100px,125px)]">
+              <div className="relative min-w-0">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
                   placeholder="Search by name, phone, email..."
@@ -279,7 +268,7 @@ export default function Dashboard() {
                   }))
                 }
               >
-                <SelectTrigger className="w-[180px]">
+                <SelectTrigger className="w-full">
                   <SelectValue placeholder="All Cities" />
                 </SelectTrigger>
                 <SelectContent>
@@ -301,7 +290,7 @@ export default function Dashboard() {
                   }))
                 }
               >
-                <SelectTrigger className="w-[180px]">
+                <SelectTrigger className="w-full">
                   <SelectValue placeholder="All Genders" />
                 </SelectTrigger>
                 <SelectContent>
@@ -323,7 +312,7 @@ export default function Dashboard() {
                   }))
                 }
               >
-                <SelectTrigger className="w-[220px]">
+                <SelectTrigger className="w-full">
                   <SelectValue placeholder="All Message Status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -345,7 +334,7 @@ export default function Dashboard() {
                     eventFrom: event.target.value,
                   }))
                 }
-                className="w-[170px]"
+                className="w-full"
               />
 
               <Input
@@ -357,10 +346,10 @@ export default function Dashboard() {
                     eventTo: event.target.value,
                   }))
                 }
-                className="w-[170px]"
+                className="w-full"
               />
 
-              <div className="flex items-center justify-center bg-primary/10 text-primary px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap ml-auto">
+              <div className="flex h-10 items-center justify-center rounded-md bg-primary/10 px-3 text-sm font-medium text-primary whitespace-nowrap">
                 {filteredSubmissions.length} results
               </div>
             </div>
@@ -375,95 +364,118 @@ export default function Dashboard() {
               </div>
               <h3 className="text-lg font-semibold text-foreground mb-1">No submissions found</h3>
               <p className="text-muted-foreground text-sm max-w-sm">
-                {loading ? "Loading data..." : "Click 'Sync WordPress' to import entries or adjust your filters."}
+                {loading ? "Loading data..." : "No entries match the current filters."}
               </p>
             </CardContent>
           </Card>
         ) : (
           <Card className="overflow-hidden shadow-sm border-border/60">
             <div className="overflow-x-auto">
-              <Table>
+              <Table className="min-w-[1280px] table-fixed">
+                <colgroup>
+                  <col className="w-[135px]" />
+                  <col className="w-[150px]" />
+                  <col className="w-[170px]" />
+                  <col className="w-[140px]" />
+                  <col className="w-[280px]" />
+                  <col className="w-[130px]" />
+                  <col className="w-[100px]" />
+                  <col className="w-[130px]" />
+                  <col className="w-[115px]" />
+                  <col className="w-[115px]" />
+                </colgroup>
                 <TableHeader className="bg-muted/50">
                   <TableRow className="hover:bg-transparent">
                     <TableHead>Name</TableHead>
-                  <TableHead>Phone</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>City</TableHead>
-                  <TableHead>Event</TableHead>
-                  <TableHead>Source</TableHead>
-                  <TableHead>Gender</TableHead>
-                  <TableHead>Event Date</TableHead>
-                  <TableHead>Welcome</TableHead>
-                  <TableHead>Reminder</TableHead>
-                </TableRow>
-              </TableHeader>
+                    <TableHead>Phone</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Event City</TableHead>
+                    <TableHead>Current City</TableHead>
+                    <TableHead>Event</TableHead>
+                    <TableHead>Source</TableHead>
+                    <TableHead>Gender</TableHead>
+                    <TableHead>Event Date</TableHead>
+                    <TableHead>Welcome</TableHead>
+                    <TableHead>Reminder</TableHead>
+                  </TableRow>
+                </TableHeader>
                 <TableBody>
                   {paginatedSubmissions.map((submission) => {
                     const welcomeStatus = getDeliveryStatus(submission, "welcome")
                     const reminderStatus = getDeliveryStatus(submission, "reminder")
 
                     return (
-                      <TableRow 
-                        key={submission.id} 
+                      <TableRow
+                        key={submission.id}
                         className="hover:bg-muted/30 transition-colors"
                       >
                         <TableCell className="font-medium">
-                        <div className="flex items-center gap-2">
-                          <User className="h-4 w-4 text-gray-400" />
-                          {submission.name}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Phone className="h-4 w-4 text-gray-400" />
-                          {submission.phone}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {submission.email && (
                           <div className="flex items-center gap-2">
-                            <Mail className="h-4 w-4 text-gray-400" />
-                            {submission.email}
+                            <User className="h-4 w-4 text-gray-400" />
+                            {submission.name}
                           </div>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {submission.city && (
-                          <Badge variant="secondary" className="font-normal text-xs bg-gray-100 text-gray-700 hover:bg-gray-200 border-0">
-                            <MapPin className="h-3 w-3 mr-1" />
-                            {submission.city}
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {submission.event && (
-                          <div className="flex items-center gap-2 text-sm text-gray-700">
-                            <Megaphone className="h-4 w-4 text-gray-400" />
-                            <span className="truncate max-w-[150px]" title={submission.event}>{submission.event}</span>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Phone className="h-4 w-4 text-gray-400" />
+                            {submission.phone}
                           </div>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {submission.infoSource && (
-                          <Badge variant="outline" className="font-normal text-xs border-gray-200">
-                            <Info className="h-3 w-3 mr-1 text-gray-400" />
-                            {submission.infoSource}
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {submission.gender && (
-                          <Badge variant={submission.gender.toLowerCase() === "male" ? "secondary" : "outline"} className="font-normal text-xs">
-                            {submission.gender}
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2 text-sm text-foreground">
-                          <Calendar className="h-4 w-4 text-muted-foreground" />
-                          {formatDateTime(submission.eventAt)}
-                        </div>
-                      </TableCell>
+                        </TableCell>
+                        <TableCell className="min-w-0">
+                          {submission.email && (
+                            <div className="flex min-w-0 items-center gap-2">
+                              <Mail className="h-4 w-4 shrink-0 text-gray-400" />
+                              <span className="truncate" title={submission.email}>
+                                {submission.email}
+                              </span>
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {submission.city && (
+                            <Badge variant="secondary" className="font-normal text-xs bg-gray-100 text-gray-700 hover:bg-gray-200 border-0">
+                              <MapPin className="h-3 w-3 mr-1" />
+                              {submission.city}
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {submission.currentCity && (
+                            <Badge variant="secondary" className="font-normal text-xs bg-blue-50 text-blue-700 hover:bg-blue-100 border-0">
+                              <MapPin className="h-3 w-3 mr-1" />
+                              {submission.currentCity}
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="min-w-0">
+                          {submission.event && (
+                            <div className="flex min-w-0 items-center gap-2 text-sm text-gray-700">
+                              <Megaphone className="h-4 w-4 shrink-0 text-gray-400" />
+                              <span className="truncate" title={submission.event}>{submission.event}</span>
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {submission.infoSource && (
+                            <Badge variant="outline" className="font-normal text-xs border-gray-200">
+                              <Info className="h-3 w-3 mr-1 text-gray-400" />
+                              {submission.infoSource}
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {submission.gender && (
+                            <Badge variant={submission.gender.toLowerCase() === "male" ? "secondary" : "outline"} className="font-normal text-xs">
+                              {submission.gender}
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2 text-sm text-foreground">
+                            <Calendar className="h-4 w-4 text-muted-foreground" />
+                            {formatDateTime(submission.eventAt)}
+                          </div>
+                        </TableCell>
                         <TableCell>
                           <div className="space-y-1">
                             {statusBadge(welcomeStatus)}
@@ -486,7 +498,7 @@ export default function Dashboard() {
                 </TableBody>
               </Table>
             </div>
-            
+
             {totalPages > 1 && (
               <div className="flex items-center justify-between px-4 py-3 border-t bg-muted/20">
                 <div className="text-sm text-muted-foreground">

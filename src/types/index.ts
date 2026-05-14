@@ -16,6 +16,7 @@ export interface FormSubmission {
   phone: string
   email?: string
   city?: string
+  currentCity?: string
   event?: string
   gender?: string
   eventAt?: string | null
@@ -43,6 +44,7 @@ export interface NormalizedSubmission {
   phone: string
   email?: string
   city?: string
+  currentCity?: string
   event?: string
   gender?: string
   eventAt: Date | null
@@ -100,4 +102,76 @@ export interface SendMessageResponse {
   waLink?: string
   messageId?: string
   deliveryStatus?: DeliveryStatus
+}
+
+export interface ImportedContact {
+  id: string
+  name: string
+  phone: string
+  normalizedPhone: string
+  email?: string
+  city?: string
+  currentLocation?: string
+  attendingDays?: string
+  infoSource?: string
+  timestamp?: string
+  source?: string
+  rawFields?: Record<string, string>
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ImportedContactInput {
+  name?: string
+  phone?: string
+  email?: string
+  city?: string
+  currentLocation?: string
+  attendingDays?: string
+  infoSource?: string
+  timestamp?: string
+  rawFields?: Record<string, string>
+}
+
+export interface CampaignMessage {
+  id: string
+  contactId?: string
+  name?: string
+  phone: string
+  normalizedPhone: string
+  templateName: string
+  status: MessageStatus
+  deliveryStatus: DeliveryStatus
+  messageId?: string | null
+  error?: string | null
+  sentAt?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ChatMessage {
+  id: string
+  phone: string
+  normalizedPhone: string
+  contactName?: string
+  direction: "inbound" | "outbound"
+  type: "text" | "template" | "unknown"
+  text: string
+  templateName?: string
+  messageId?: string | null
+  deliveryStatus?: DeliveryStatus
+  error?: string | null
+  rawPayload?: unknown
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ChatThread {
+  normalizedPhone: string
+  phone: string
+  name?: string
+  lastMessage?: string
+  lastMessageAt?: string
+  unreadCount: number
+  totalMessages: number
 }
