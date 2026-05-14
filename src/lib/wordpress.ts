@@ -85,14 +85,22 @@ function pickFieldValue(
   flattened: Array<{ key: string; label: string; value: string }>,
   candidates: string[],
 ) {
+  // First pass: exact key/label match (most reliable)
+  for (const candidate of candidates) {
+    const lower = candidate.toLowerCase()
+    const exact = flattened.find(
+      (item) => item.label.toLowerCase() === lower || item.key.toLowerCase() === lower,
+    )
+    if (exact?.value) return exact.value
+  }
+
+  // Second pass: partial includes match (fallback for varied field names)
   for (const candidate of candidates) {
     const lower = candidate.toLowerCase()
     const match = flattened.find(
       (item) => item.label.toLowerCase().includes(lower) || item.key.toLowerCase().includes(lower),
     )
-    if (match?.value) {
-      return match.value
-    }
+    if (match?.value) return match.value
   }
 
   return ""
