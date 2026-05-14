@@ -69,6 +69,7 @@ function mapChat(doc: ChatDocument): ChatMessage {
     messageId: doc.messageId || null,
     deliveryStatus: doc.deliveryStatus,
     error: doc.error || null,
+    isRead: (doc as unknown as Record<string, unknown>).isRead === true,
     rawPayload: doc.rawPayload,
     createdAt: doc.createdAt.toISOString(),
     updatedAt: doc.updatedAt.toISOString(),
@@ -92,7 +93,7 @@ export function threadFromMessages(messages: ChatMessage[]): ChatThread[] {
     thread.lastMessage = message.text
     thread.lastMessageAt = message.createdAt
     thread.totalMessages += 1
-    if (message.direction === "inbound") thread.unreadCount += 1
+    if (message.direction === "inbound" && !message.isRead) thread.unreadCount += 1
     map.set(message.normalizedPhone, thread)
   }
 
@@ -206,4 +207,30 @@ export async function updateChatMessageStatusByMessageId(
   })
   if (updated) await writeJsonFile(chatsFilePath, next)
   return updated
+}
+
+export async function markAsRead(phone: string) {
+  const normalizedPhone = phone ? normalizePhoneNumber(phone) : ""
+  if (!normalizedPhone) return 0
+
+  if (shouldUseMongo()) {
+    const collection = await getChatsCollection()
+    const result = await collection.updateMany(
+      { normalizedPhone, direction: "inbound", isRead: { $ne: true } },
+      { $set: { isRead: true, updatedAt: new Date() } },
+    )
+    return result.modifiedCount
+  }
+
+  const records = await readJsonFile<ChatMessage>(chatsFilePath)
+  let count = 0
+  const next = records.map((item) => {
+    if (item.normalizedPhone === normalizedPhone && item.direction === "inbound" && !item.isRead) {
+      count += 1
+      return { ...item, isRead: true, updatedAt: new Date().toISOString() }
+    }
+    return item
+  })
+  if (count > 0) await writeJsonFile(chatsFilePath, next)
+  return count
 }

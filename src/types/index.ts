@@ -161,6 +161,7 @@ export interface ChatMessage {
   messageId?: string | null
   deliveryStatus?: DeliveryStatus
   error?: string | null
+  isRead?: boolean
   rawPayload?: unknown
   createdAt: string
   updatedAt: string
