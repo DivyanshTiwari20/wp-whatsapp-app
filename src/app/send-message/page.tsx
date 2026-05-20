@@ -15,6 +15,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { normalizePhoneNumber } from "@/lib/phone"
 import type { CampaignMessage, FormSubmission, ImportedContact, ImportedContactInput } from "@/types"
@@ -113,6 +120,7 @@ export default function SendMessagePage() {
   const [messages, setMessages] = useState<CampaignMessage[]>([])
   const [selected, setSelected] = useState<string[]>([])
   const [audience, setAudience] = useState<Audience>("imported")
+  const [selectedCity, setSelectedCity] = useState<string>("all")
   const [query, setQuery] = useState("")
   const [loading, setLoading] = useState(false)
   const [sending, setSending] = useState(false)
@@ -133,15 +141,22 @@ export default function SendMessagePage() {
 
   const filteredLeads = useMemo(() => {
     const needle = query.toLowerCase()
-    return allLeads.filter(
-      (lead) =>
+    return allLeads.filter((lead) => {
+      const matchesCity = selectedCity === "all" || (lead.city || "").toLowerCase() === selectedCity.toLowerCase()
+      const matchesSearch =
         lead.name.toLowerCase().includes(needle) ||
         lead.phone.includes(query) ||
         (lead.email || "").toLowerCase().includes(needle) ||
         (lead.city || "").toLowerCase().includes(needle) ||
-        (lead.event || "").toLowerCase().includes(needle),
-    )
-  }, [allLeads, query])
+        (lead.event || "").toLowerCase().includes(needle)
+      return matchesCity && matchesSearch
+    })
+  }, [allLeads, query, selectedCity])
+
+  const uniqueCities = useMemo(() => {
+    const cities = allLeads.map((l) => (l.city || "").trim()).filter(Boolean)
+    return Array.from(new Set(cities)).sort()
+  }, [allLeads])
 
   async function loadAll(silent = false) {
     if (!silent && typeof window !== 'undefined') {
@@ -206,6 +221,7 @@ export default function SendMessagePage() {
   function changeAudience(value: Audience) {
     setAudience(value)
     setSelected([])
+    setSelectedCity("all")
   }
 
   function openCreateLead() {
@@ -278,7 +294,7 @@ export default function SendMessagePage() {
       const response = await fetch("/api/campaigns/revisiting/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(sendAll ? { audience } : { audience, leadIds: selected }),
+        body: JSON.stringify(sendAll ? { audience, leadIds: filteredLeads.map((l) => l.id) } : { audience, leadIds: selected }),
       })
       const data = await response.json()
       if (!response.ok) throw new Error(data?.error || "Send failed")
@@ -313,7 +329,7 @@ export default function SendMessagePage() {
               {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
               Send Selected
             </Button>
-            <Button onClick={() => sendCampaign(true)} disabled={sending || allLeads.length === 0}>
+            <Button onClick={() => sendCampaign(true)} disabled={sending || filteredLeads.length === 0}>
               {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Users className="h-4 w-4" />}
               Send All Visible
             </Button>
@@ -379,6 +395,19 @@ export default function SendMessagePage() {
                 Audience Leads <span className="ml-2 text-xs font-normal text-slate-500">({audienceOptions.find((item) => item.value === audience)?.label})</span>
               </CardTitle>
               <div className="flex w-full flex-col gap-2 sm:flex-row lg:w-auto">
+                <Select value={selectedCity} onValueChange={setSelectedCity}>
+                  <SelectTrigger className="w-full sm:w-[180px]">
+                    <SelectValue placeholder="Filter by City" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Cities</SelectItem>
+                    {uniqueCities.map((city) => (
+                      <SelectItem key={city} value={city}>
+                        {city}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <div className="relative w-full sm:w-72">
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                   <Input className="pl-9" placeholder="Search audience..." value={query} onChange={(e) => setQuery(e.target.value)} />
